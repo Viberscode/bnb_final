@@ -76,9 +76,9 @@ export function SiteHeader({
               ? "focus-visible:ring-crimson"
               : "focus-visible:ring-white",
           )}
-          aria-label="BloodNearby home"
+          aria-label="BNB home"
         >
-          <BrandLogo tone={isSolid ? "brand" : "light"} size="md" />
+          <BrandLogo tone={isSolid ? "brand" : "light"} size="md" wordmark="BNB" />
         </Link>
 
         <nav

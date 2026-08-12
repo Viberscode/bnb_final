@@ -81,14 +81,17 @@ interface BrandLogoProps {
   markClassName?: string;
   tone?: "light" | "brand";
   size?: "sm" | "md" | "lg";
+  /** Visible wordmark text (default: BloodNearby). */
+  wordmark?: string;
 }
 
-/** Full wordmark: mark + BloodNearby. */
+/** Full wordmark: mark + brand name. */
 export function BrandLogo({
   className,
   markClassName,
   tone = "brand",
   size = "md",
+  wordmark = "BloodNearby",
 }: BrandLogoProps) {
   const isLight = tone === "light";
 
@@ -113,7 +116,7 @@ export function BrandLogo({
           isLight ? "text-white" : "text-ink",
         )}
       >
-        BloodNearby
+        {wordmark}
         <span className="text-crimson" aria-hidden>
           .
         </span>

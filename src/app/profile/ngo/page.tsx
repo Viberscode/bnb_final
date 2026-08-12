@@ -119,19 +119,36 @@ export default function NgoProfilePage() {
               </section>
 
               <dl className="grid gap-3 sm:grid-cols-2">
-                {[
-                  [t("ngo.address"), profile.address, "address", MapPin],
-                  [t("ngo.phone"), profile.phone, "phone", Phone],
-                  [t("ngo.person"), profile.authorizedPerson, "person", UserRound],
+                {(
                   [
-                    t("ngo.certificate"),
-                    profile.certificateName || "—",
-                    "cert",
-                    Building2,
-                  ],
-                ].map(([label, value, key, Icon]) => (
+                    {
+                      key: "address",
+                      label: t("ngo.address"),
+                      value: profile.address,
+                      Icon: MapPin,
+                    },
+                    {
+                      key: "phone",
+                      label: t("ngo.phone"),
+                      value: profile.phone,
+                      Icon: Phone,
+                    },
+                    {
+                      key: "person",
+                      label: t("ngo.person"),
+                      value: profile.authorizedPerson,
+                      Icon: UserRound,
+                    },
+                    {
+                      key: "cert",
+                      label: t("ngo.certificate"),
+                      value: profile.certificateName || "—",
+                      Icon: Building2,
+                    },
+                  ] as const
+                ).map(({ key, label, value, Icon }) => (
                   <div
-                    key={String(key)}
+                    key={key}
                     className="rounded-xl border border-line bg-white/80 px-3.5 py-2.5"
                   >
                     <dt className="flex items-center gap-1.5 text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink-muted">

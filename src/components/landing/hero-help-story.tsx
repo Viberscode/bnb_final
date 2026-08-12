@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/i18n/language-provider";
 
 const DROP_GAIN = 20;
-/** Drops fire once during the visual story — then BloodKit. No extra fill loop. */
+/** Drops fire once during the visual story — then BloodNearby. No extra fill loop. */
 const DROP_TIMES_MS = [2800, 3600, 4400, 5200];
 const STORY_MS = 6200;
 const BRAND_MS = 2600;
@@ -243,7 +243,7 @@ export function HeroHelpStory({ className }: { className?: string }) {
             phase === "brand" && "story-brand-finale",
           )}
         >
-          BloodKit
+          BloodNearby
           <span className="text-[#ff2d4a]">.</span>
         </p>
       </div>

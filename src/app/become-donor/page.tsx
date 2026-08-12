@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 export const metadata: Metadata = {
   title: "Become a Donor",
   description:
-    "Register as a BloodKit donor — blood group, location, and availability — then open your profile dashboard.",
+    "Register as a BloodNearby donor — blood group, location, and availability — then open your profile dashboard.",
 };
 
 export default function BecomeDonorPage() {

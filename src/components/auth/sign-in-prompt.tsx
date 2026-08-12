@@ -160,7 +160,7 @@ export function SignInPromptProvider({ children }: { children: ReactNode }) {
               />
             </div>
             <p className="mt-4 text-center text-xs text-ink-muted">
-              Your session syncs to BloodKit in real time.
+              Your session syncs to BloodNearby in real time.
             </p>
           </div>
         </div>

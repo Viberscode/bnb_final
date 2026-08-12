@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "My Account",
   description:
-    "Your BloodKit account — live requests and donor profile hub.",
+    "Your BloodNearby account — live requests and donor profile hub.",
 };
 
 export default function ProfileLayout({

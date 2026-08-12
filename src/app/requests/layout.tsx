@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Live requests",
   description:
-    "Open blood needs on BloodKit — urgency-sorted feed of requests that need donors now.",
+    "Open blood needs on BloodNearby — urgency-sorted feed of requests that need donors now.",
 };
 
 export default function RequestsLayout({

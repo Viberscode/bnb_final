@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Dramatic first-paint entrance for the BloodKit wordmark */
+/** Dramatic first-paint entrance for the BloodNearby wordmark */
 export function BloodKitHeading({
   className,
   id,
@@ -12,7 +12,7 @@ export function BloodKitHeading({
   id?: string;
 }) {
   const [ready, setReady] = useState(false);
-  const letters = ["B", "l", "o", "o", "d", "K", "i", "t"];
+  const letters = ["B", "l", "o", "o", "d", "N", "e", "a", "r", "b", "y"];
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setReady(true));
@@ -24,10 +24,10 @@ export function BloodKitHeading({
       id={id}
       className={cn(
         "font-display font-extrabold leading-[0.88] tracking-[-0.05em] text-white",
-        "text-[clamp(3.5rem,11vw,6.75rem)]",
+        "text-[clamp(2.75rem,9vw,5.5rem)]",
         className,
       )}
-      aria-label="BloodKit"
+      aria-label="BloodNearby"
     >
       {letters.map((letter, i) => (
         <span
@@ -39,7 +39,7 @@ export function BloodKitHeading({
               : "translate-y-8 scale-90 opacity-0 blur-sm",
           )}
           style={{
-            transitionDelay: ready ? `${80 + i * 55}ms` : "0ms",
+            transitionDelay: ready ? `${80 + i * 45}ms` : "0ms",
             transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
@@ -52,7 +52,7 @@ export function BloodKitHeading({
           ready ? "translate-y-0 scale-100 opacity-100" : "translate-y-6 scale-50 opacity-0",
         )}
         style={{
-          transitionDelay: ready ? "560ms" : "0ms",
+          transitionDelay: ready ? "620ms" : "0ms",
           transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         aria-hidden

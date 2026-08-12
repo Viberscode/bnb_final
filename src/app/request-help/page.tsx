@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 export const metadata: Metadata = {
   title: "Request Help",
   description:
-    "Submit a blood need — group, nearby hospital, and urgency — and go live on BloodKit.",
+    "Submit a blood need — group, nearby hospital, and urgency — and go live on BloodNearby.",
 };
 
 export default function RequestHelpPage() {

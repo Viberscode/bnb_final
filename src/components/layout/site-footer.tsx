@@ -72,7 +72,7 @@ export function SiteFooter() {
 
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p>© {new Date().getFullYear()} BloodKit.</p>
+          <p>© {new Date().getFullYear()} BloodNearby.</p>
           <p>{t("footer.demo")}</p>
         </div>
       </div>

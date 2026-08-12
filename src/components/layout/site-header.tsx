@@ -76,7 +76,7 @@ export function SiteHeader({
               ? "focus-visible:ring-crimson"
               : "focus-visible:ring-white",
           )}
-          aria-label="BloodKit home"
+          aria-label="BloodNearby home"
         >
           <BrandLogo tone={isSolid ? "brand" : "light"} size="md" />
         </Link>

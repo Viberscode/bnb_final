@@ -83,7 +83,7 @@ interface BrandLogoProps {
   size?: "sm" | "md" | "lg";
 }
 
-/** Full wordmark: mark + BloodKit. */
+/** Full wordmark: mark + BloodNearby. */
 export function BrandLogo({
   className,
   markClassName,
@@ -107,13 +107,13 @@ export function BrandLogo({
       <span
         className={cn(
           "font-display font-black tracking-[-0.05em] leading-none",
-          size === "sm" && "text-xl",
-          size === "md" && "text-[1.45rem] sm:text-[1.7rem]",
-          size === "lg" && "text-3xl sm:text-4xl",
+          size === "sm" && "text-lg",
+          size === "md" && "text-[1.2rem] sm:text-[1.45rem]",
+          size === "lg" && "text-2xl sm:text-3xl",
           isLight ? "text-white" : "text-ink",
         )}
       >
-        BloodKit
+        BloodNearby
         <span className="text-crimson" aria-hidden>
           .
         </span>

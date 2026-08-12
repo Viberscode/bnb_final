@@ -25,11 +25,11 @@ const hindi = Noto_Sans_Devanagari({
 
 export const metadata: Metadata = {
   title: {
-    default: "BloodKit — Real-time blood donation matching",
-    template: "%s · BloodKit",
+    default: "BloodNearby — Real-time blood donation matching",
+    template: "%s · BloodNearby",
   },
   description:
-    "BloodKit connects donors, patients, and verified NGOs/hospitals with intelligent, real-time blood request matching across India.",
+    "BloodNearby connects donors, patients, and verified NGOs/hospitals with intelligent, real-time blood request matching across India.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

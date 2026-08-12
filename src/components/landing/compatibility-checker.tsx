@@ -8,6 +8,7 @@ import {
   compatibilitySummary,
 } from "@/lib/blood-compatibility";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 type ViewMode = "donate" | "receive";
 
@@ -93,7 +94,16 @@ export function CompatibilityChecker() {
   const [selected, setSelected] = useState<BloodGroup>("O+");
   const [mode, setMode] = useState<ViewMode>("donate");
   const [bumpKey, setBumpKey] = useState(0);
-  const { donateTo, receiveFrom, tip } = compatibilitySummary(selected);
+  const { t } = useLanguage();
+  const { donateTo, receiveFrom } = compatibilitySummary(selected);
+  const tip =
+    selected === "O-"
+      ? t("compat.tipONeg")
+      : selected === "AB+"
+        ? t("compat.tipABPos")
+        : donateTo.length >= 4
+          ? t("compat.tipSeveral", { group: selected })
+          : t("compat.tipFocused", { group: selected });
 
   const matches = mode === "donate" ? donateTo : receiveFrom;
   const helpCount = donateTo.length;
@@ -130,13 +140,13 @@ export function CompatibilityChecker() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-1.5 rounded-full bg-crimson-soft px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-crimson">
             <Sparkles className="size-3.5" aria-hidden />
-            Play &amp; learn
+            {t("compat.kicker")}
           </p>
           <h2
             id="compat-heading"
             className="mt-2 font-display text-2xl font-extrabold tracking-tight text-ink sm:text-4xl"
           >
-            Who can your blood help?
+            {t("compat.title")}
           </h2>
         </div>
 
@@ -144,15 +154,15 @@ export function CompatibilityChecker() {
           {/* Top playground */}
           <div className="grid gap-2 border-b border-line/70 lg:grid-cols-[1fr_auto_1fr]">
             <div className="flex flex-col justify-center p-6 sm:p-8">
-              <p className="text-sm font-bold text-ink">Pick your group</p>
+              <p className="text-sm font-bold text-ink">{t("compat.pick")}</p>
               <p className="mt-1 text-sm text-ink-muted">
-                Give each one a tap — the droplet reacts
+                {t("compat.pickHint")}
               </p>
 
               <div
                 className="mt-5 grid grid-cols-4 gap-2 sm:gap-2.5"
                 role="radiogroup"
-                aria-label="Select blood group"
+                aria-label={t("compat.selectGroup")}
               >
                 {BLOOD_GROUPS.map((group) => {
                   const isActive = selected === group;
@@ -183,17 +193,17 @@ export function CompatibilityChecker() {
 
             <div className="flex flex-col justify-center p-6 sm:p-8">
               <p className="text-sm font-bold uppercase tracking-wider text-ink-muted">
-                Instant readout
+                {t("compat.instant")}
               </p>
               <p
                 key={`count-${selected}`}
                 className="animate-pop-in mt-2 font-display text-4xl font-extrabold tracking-tight text-ink sm:text-5xl"
               >
-                Helps{" "}
+                {t("compat.helps")}{" "}
                 <span className="bg-gradient-to-r from-crimson to-[#ff5a75] bg-clip-text text-transparent">
                   {helpCount}
                 </span>{" "}
-                {helpCount === 1 ? "group" : "groups"}
+                {helpCount === 1 ? t("compat.group") : t("compat.groups")}
               </p>
               <p
                 key={`tip-${selected}`}
@@ -210,7 +220,7 @@ export function CompatibilityChecker() {
             <div
               className="mx-auto flex w-fit rounded-2xl bg-mist/80 p-1.5"
               role="tablist"
-              aria-label="Compatibility view"
+              aria-label={t("compat.viewLabel")}
             >
               <button
                 type="button"
@@ -224,7 +234,7 @@ export function CompatibilityChecker() {
                     : "text-ink-muted hover:text-ink",
                 )}
               >
-                I want to donate
+                {t("compat.wantDonate")}
               </button>
               <button
                 type="button"
@@ -238,7 +248,7 @@ export function CompatibilityChecker() {
                     : "text-ink-muted hover:text-ink",
                 )}
               >
-                I need blood
+                {t("compat.needBlood")}
               </button>
             </div>
 
@@ -255,8 +265,8 @@ export function CompatibilityChecker() {
                 <ArrowRight className="size-4 text-ink-muted" aria-hidden />
                 <span>
                   {mode === "donate"
-                    ? "can donate to these groups"
-                    : "can receive from these groups"}
+                    ? t("compat.canDonateTo")
+                    : t("compat.canReceiveFrom")}
                 </span>
               </p>
             </div>
@@ -279,8 +289,7 @@ export function CompatibilityChecker() {
             <p className="mx-auto mt-8 flex max-w-xl items-start justify-center gap-2 text-center text-xs leading-relaxed text-ink-muted">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               <span>
-                Fun guide only — hospitals confirm final eligibility (age,
-                health, last donation date) before you donate.
+                {t("compat.funGuide")}
               </span>
             </p>
           </div>

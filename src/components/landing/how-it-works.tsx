@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HOW_IT_WORKS } from "@/data/demo";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 type BoxState = "red" | "emergency" | "to-green" | "green" | "to-red";
@@ -19,6 +20,7 @@ const CYCLE = {
 
 export function HowItWorks() {
   const [tick, setTick] = useState(0);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const start = performance.now();
@@ -74,17 +76,16 @@ export function HowItWorks() {
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-crimson">
-            How it works
+            {t("how.kicker")}
           </p>
           <h2
             id="how-heading"
             className="mt-3 font-display text-3xl font-extrabold tracking-tight sm:text-5xl"
           >
-            Raise. Match. Arrive.
+            {t("how.title")}
           </h2>
           <p className="mt-4 text-base text-white/65 sm:text-lg">
-            Three steps designed for stress — no dashboards to hunt through when
-            someone needs blood now.
+            {t("how.body")}
           </p>
         </div>
 
@@ -119,10 +120,18 @@ export function HowItWorks() {
                       {item.step}
                     </span>
                     <h3 className="mt-3 font-display text-2xl font-bold tracking-tight">
-                      {item.title}
+                      {index === 0
+                        ? t("how.raise")
+                        : index === 1
+                          ? t("how.match")
+                          : t("how.arrive")}
                     </h3>
                     <p className="mt-3 text-[0.98rem] leading-relaxed text-white/65">
-                      {item.description}
+                      {index === 0
+                        ? t("how.raiseBody")
+                        : index === 1
+                          ? t("how.matchBody")
+                          : t("how.arriveBody")}
                     </p>
                   </li>
 

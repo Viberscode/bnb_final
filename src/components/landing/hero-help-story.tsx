@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 const DROP_GAIN = 20;
 /** Drops fire once during the visual story — then BloodKit. No extra fill loop. */
@@ -24,6 +25,7 @@ function wait(ms: number) {
 
 /** Story + life bar together → finale BLOODKIT. (no bar repetition) */
 export function HeroHelpStory({ className }: { className?: string }) {
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<Phase>("story");
   const [cycle, setCycle] = useState(0);
   const [life, setLife] = useState(18);
@@ -91,9 +93,9 @@ export function HeroHelpStory({ className }: { className?: string }) {
         )}
       >
         <div className="mb-3 flex items-center justify-between text-[0.7rem] font-bold uppercase tracking-[0.16em] text-white/55">
-          <span>How BloodKit works</span>
+          <span>{t("hero.howItWorks")}</span>
           <span className="rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] normal-case tracking-normal text-white/80">
-            Need → Match → Helped
+            {t("hero.flow")}
           </span>
         </div>
 
@@ -200,7 +202,7 @@ export function HeroHelpStory({ className }: { className?: string }) {
 
         <div className="mt-3 border-t border-white/10 pt-4">
           <div className="mb-2 flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/55">
-            <span>Life</span>
+            <span>{t("hero.life")}</span>
             <span className="tabular-nums text-[#7dffa8]">{life}%</span>
           </div>
 

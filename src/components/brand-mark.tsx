@@ -67,7 +67,7 @@ export function BrandMark({ className, tone = "brand" }: BrandMarkProps) {
       <path
         d="M14.5 28H19.2L21.4 21.5L24.8 35.5L28.2 28H33.5"
         stroke={isLight ? "#C4122F" : "#ffffff"}
-        strokeWidth="2.8"
+        strokeWidth="3.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         filter={`url(#glow-${uid})`}
@@ -106,7 +106,7 @@ export function BrandLogo({
       />
       <span
         className={cn(
-          "font-display font-extrabold tracking-[-0.045em] leading-none",
+          "font-display font-black tracking-[-0.05em] leading-none",
           size === "sm" && "text-xl",
           size === "md" && "text-[1.45rem] sm:text-[1.7rem]",
           size === "lg" && "text-3xl sm:text-4xl",

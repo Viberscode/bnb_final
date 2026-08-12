@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "My Profile",
+  title: "My Account",
   description:
-    "Your BloodKit donor dashboard — availability, trust score, and matching requests.",
+    "Your BloodKit account — live requests and donor profile hub.",
 };
 
 export default function ProfileLayout({

@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import type { NetworkStats } from "@/types";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 interface NetworkStatusProps {
@@ -179,6 +180,7 @@ function MetricCard({
 }
 
 export function NetworkStatus({ stats }: NetworkStatusProps) {
+  const { t } = useLanguage();
   return (
     <section
       id="network"
@@ -203,20 +205,19 @@ export function NetworkStatus({ stats }: NetworkStatusProps) {
               id="network-heading"
               className="font-display text-[2.35rem] font-extrabold leading-none tracking-[-0.05em] text-ink sm:text-5xl lg:text-6xl"
             >
-              Network{" "}
+              {t("network.title")}{" "}
               <span className="network-pulse-word inline-block bg-gradient-to-r from-[#c4122f] via-[#ff2d4a] to-[#9f1239] bg-clip-text text-transparent">
-                pulse
+                {t("network.pulse")}
               </span>
             </h2>
             <p className="mt-2 text-sm text-ink-muted sm:text-base">
-              Standby donors, fulfilled requests, and response speed — live feel
-              of the BloodKit network.
+              {t("network.body")}
             </p>
           </div>
 
           {stats.isDemo && (
             <p className="w-fit rounded-full border border-teal/25 bg-gradient-to-r from-teal-soft to-white px-4 py-2 text-[0.65rem] font-bold uppercase tracking-wider text-teal-deep shadow-sm">
-              Demo data · not live yet
+              {t("network.demo")}
             </p>
           )}
         </div>
@@ -246,7 +247,17 @@ export function NetworkStatus({ stats }: NetworkStatusProps) {
             {METRICS.map((metric) => (
               <MetricCard
                 key={metric.key}
-                label={metric.label}
+                label={
+                  metric.key === "donors"
+                    ? t("network.donors")
+                    : metric.key === "fulfilled"
+                      ? t("network.fulfilled")
+                      : metric.key === "response"
+                        ? t("network.response")
+                        : metric.key === "critical"
+                          ? t("network.critical")
+                          : t("network.partners")
+                }
                 value={metric.getValue(stats)}
                 suffix={"suffix" in metric ? metric.suffix : ""}
                 icon={metric.icon}

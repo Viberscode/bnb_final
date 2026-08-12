@@ -1,8 +1,16 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
+import { useSignInPrompt } from "@/components/auth/sign-in-prompt";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { useAuth } from "@/components/auth/auth-provider";
 import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
+import { fetchNgoProfile, subscribeNgoProfile } from "@/lib/ngo-profile";
 import { cn } from "@/lib/utils";
 
 function HeartBloodIcon({ className }: { className?: string }) {
@@ -23,14 +31,12 @@ function HeartBloodIcon({ className }: { className?: string }) {
           <path d="M36 61C36 61 10 44 10 27.5C10 18.5 16.5 12 24.5 12C29.5 12 33.5 14.5 36 18.5C38.5 14.5 42.5 12 47.5 12C55.5 12 62 18.5 62 27.5C62 44 36 61 36 61Z" />
         </clipPath>
       </defs>
-      {/* Outline heart */}
       <path
         d="M36 61C36 61 10 44 10 27.5C10 18.5 16.5 12 24.5 12C29.5 12 33.5 14.5 36 18.5C38.5 14.5 42.5 12 47.5 12C55.5 12 62 18.5 62 27.5C62 44 36 61 36 61Z"
         stroke="rgba(255,255,255,0.55)"
         strokeWidth="2.2"
         fill="rgba(255,255,255,0.06)"
       />
-      {/* Half-filled blood */}
       <g clipPath="url(#heartClip)">
         <rect
           x="8"
@@ -46,7 +52,6 @@ function HeartBloodIcon({ className }: { className?: string }) {
           className="hero-heart-wave"
         />
       </g>
-      {/* Shine */}
       <ellipse cx="26" cy="24" rx="5" ry="7" fill="white" opacity="0.22" />
     </svg>
   );
@@ -60,21 +65,18 @@ function HandshakeIcon({ className }: { className?: string }) {
       fill="none"
       aria-hidden
     >
-      {/* Left cuff */}
       <path
         d="M8 34L20 28L28 40L16 46Z"
         fill="#0d9488"
         stroke="rgba(255,255,255,0.35)"
         strokeWidth="1.2"
       />
-      {/* Right cuff */}
       <path
         d="M64 34L52 28L44 40L56 46Z"
         fill="#115e59"
         stroke="rgba(255,255,255,0.35)"
         strokeWidth="1.2"
       />
-      {/* Clasped hands */}
       <path
         d="M20 30C24 24 32 22 38 26C42 22 50 24 54 30C56 34 54 40 48 44C44 47 40 48 36 48C32 48 28 47 24 44C18 40 16 34 20 30Z"
         fill="url(#handGrad)"
@@ -88,14 +90,12 @@ function HandshakeIcon({ className }: { className?: string }) {
           <stop offset="1" stopColor="#0f766e" />
         </linearGradient>
       </defs>
-      {/* Fingers suggest grip */}
       <path
         d="M28 36C30 34 34 34 36 36M34 40C36 38 40 38 42 40M40 33C42 31 46 32 48 34"
         stroke="rgba(255,255,255,0.45)"
         strokeWidth="1.6"
         strokeLinecap="round"
       />
-      {/* Respect spark */}
       <circle cx="36" cy="18" r="2.2" fill="#fde68a" opacity="0.9" />
       <path
         d="M36 12V15M36 21V24M30 18H33M39 18H42"
@@ -123,20 +123,17 @@ function NgoShieldIcon({ className }: { className?: string }) {
           <stop offset="1" stopColor="#1e3a8a" />
         </linearGradient>
       </defs>
-      {/* Shield / care network */}
       <path
         d="M36 10L58 20V34C58 48 48 58 36 62C24 58 14 48 14 34V20L36 10Z"
         fill="url(#shieldGrad)"
         stroke="rgba(255,255,255,0.45)"
         strokeWidth="1.8"
       />
-      {/* Medical cross */}
       <path
         d="M33 26H39V33H46V39H39V46H33V39H26V33H33V26Z"
         fill="white"
         opacity="0.95"
       />
-      {/* Community dots */}
       <circle cx="22" cy="52" r="3" fill="#93c5fd" opacity="0.9" />
       <circle cx="36" cy="56" r="3.2" fill="white" opacity="0.95" />
       <circle cx="50" cy="52" r="3" fill="#93c5fd" opacity="0.9" />
@@ -156,6 +153,7 @@ const ACTIONS = [
     title: "Request Help",
     subtitle: "Need blood now",
     href: "/request-help",
+    message: "Sign in with Google before requesting blood help.",
     Icon: HeartBloodIcon,
     className:
       "from-[#6b1a28]/95 via-[#4a121c]/90 to-[#321018]/90 ring-[#ff2d4a]/40 hover:ring-[#ff2d4a]/65 shadow-[0_18px_40px_-18px_rgba(255,45,74,0.65)]",
@@ -166,6 +164,7 @@ const ACTIONS = [
     title: "Become a Donor",
     subtitle: "Stand by with respect",
     href: "/become-donor",
+    message: "Sign in with Google before registering as a donor.",
     Icon: HandshakeIcon,
     className:
       "from-[#145a50]/95 via-[#0f423b]/90 to-[#0b302c]/90 ring-teal/45 hover:ring-teal/70 shadow-[0_18px_40px_-18px_rgba(15,159,122,0.6)]",
@@ -175,7 +174,8 @@ const ACTIONS = [
     role: "ngo",
     title: "NGO / Hospital",
     subtitle: "Partner & protect",
-    href: "/auth?role=ngo",
+    href: "/become-ngo",
+    message: "Sign in with Google for NGO / hospital access.",
     Icon: NgoShieldIcon,
     className:
       "from-[#1e3a6e]/95 via-[#172d55]/90 to-[#122240]/90 ring-sky-400/40 hover:ring-sky-400/65 shadow-[0_18px_40px_-18px_rgba(47,111,237,0.6)]",
@@ -184,6 +184,29 @@ const ACTIONS = [
 ] as const;
 
 export function LandingHero() {
+  const router = useRouter();
+  const { requireAuth } = useSignInPrompt();
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const [ngoName, setNgoName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const profile = await fetchNgoProfile(user?.id);
+      if (!active) return;
+      setNgoName(profile?.name ?? null);
+    };
+    void refresh();
+    const unsub = subscribeNgoProfile(() => {
+      void refresh();
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [user?.id]);
+
   return (
     <section
       className="relative isolate flex h-[100svh] max-h-[100svh] overflow-hidden bg-[#1c0d14]"
@@ -197,10 +220,13 @@ export function LandingHero() {
 
           <div className="animate-hero-reveal-delay-1 mt-5 flex flex-col gap-3 sm:mt-6">
             <h1 className="font-display text-[clamp(1.05rem,2.4vw,1.45rem)] font-semibold uppercase tracking-[0.22em] text-white/90">
-              Blinkit for blood
+              {t("hero.tagline")}
             </h1>
 
-            <div className="h-px w-16 bg-gradient-to-r from-[#ff2d4a] to-transparent sm:w-24" aria-hidden />
+            <div
+              className="h-px w-16 bg-gradient-to-r from-[#ff2d4a] to-transparent sm:w-24"
+              aria-hidden
+            />
 
             <svg
               viewBox="0 0 360 28"
@@ -221,12 +247,27 @@ export function LandingHero() {
 
           <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-3.5 sm:mt-10 sm:max-w-none sm:grid-cols-3 lg:max-w-md lg:grid-cols-1">
             {ACTIONS.map((action) => (
-              <Link
+              <button
                 key={action.role}
-                href={action.href}
+                type="button"
+                onClick={() => {
+                  const dest =
+                    action.role === "ngo" && ngoName
+                      ? "/profile/ngo"
+                      : action.href;
+                  if (requireAuth(dest, t(
+                    action.role === "patient"
+                      ? "auth.requestMessage"
+                      : action.role === "donor"
+                        ? "auth.donorMessage"
+                        : "auth.ngoRegisterMessage",
+                  ))) {
+                    router.push(dest);
+                  }
+                }}
                 className={cn(
                   "group relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br p-4 ring-1 backdrop-blur-sm transition duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c0d14]",
-                  "hover:-translate-y-1 hover:scale-[1.02]",
+                  "hover:-translate-y-1 hover:scale-[1.02] text-left",
                   action.className,
                 )}
               >
@@ -247,11 +288,21 @@ export function LandingHero() {
                 </span>
 
                 <span className="relative min-w-0 flex-1">
-                  <span className="block font-display text-lg font-extrabold tracking-tight text-white sm:text-xl">
-                    {action.title}
+                  <span className="block truncate font-display text-lg font-extrabold tracking-tight text-white sm:text-xl">
+                    {action.role === "patient"
+                      ? t("hero.requestTitle")
+                      : action.role === "donor"
+                        ? t("hero.donorTitle")
+                        : ngoName || t("hero.ngoTitle")}
                   </span>
                   <span className="mt-0.5 block text-sm text-white/65">
-                    {action.subtitle}
+                    {action.role === "patient"
+                      ? t("hero.requestSub")
+                      : action.role === "donor"
+                        ? t("hero.donorSub")
+                        : ngoName
+                          ? t("hero.ngoRegistered")
+                          : t("hero.ngoSub")}
                   </span>
                 </span>
 
@@ -259,13 +310,20 @@ export function LandingHero() {
                   className="relative size-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white"
                   aria-hidden
                 />
-              </Link>
+              </button>
             ))}
           </div>
         </div>
 
+        <div className="absolute right-5 top-[4.75rem] z-20 sm:right-8 lg:hidden">
+          <LanguageSwitcher variant="hero" />
+        </div>
+
         <div className="animate-hero-reveal-delay-2 hidden w-full max-w-md justify-self-end lg:block">
-          <HeroHelpStory />
+          <div className="flex justify-end">
+            <LanguageSwitcher variant="hero" />
+          </div>
+          <HeroHelpStory className="mt-6" />
         </div>
       </div>
     </section>

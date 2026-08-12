@@ -44,10 +44,26 @@ create table if not exists public.blood_requests (
   phone text not null default '',
   units integer not null default 1,
   notes text,
+  voice_note_url text,
+  patients_count integer not null default 1,
+  blood_groups text[] not null default '{}',
+  group_units jsonb not null default '{}'::jsonb,
   status text not null default 'matching',
   distance_km numeric,
   created_at timestamptz not null default now()
 );
+
+alter table public.blood_requests
+  add column if not exists voice_note_url text;
+
+alter table public.blood_requests
+  add column if not exists patients_count integer not null default 1;
+
+alter table public.blood_requests
+  add column if not exists blood_groups text[] not null default '{}';
+
+alter table public.blood_requests
+  add column if not exists group_units jsonb not null default '{}'::jsonb;
 
 create index if not exists blood_requests_created_at_idx
   on public.blood_requests (created_at desc);
@@ -111,6 +127,47 @@ create policy "Authenticated users can create blood requests"
 create policy "Owners can update their blood requests"
   on public.blood_requests for update using (auth.uid() = user_id);
 
+-- Voice notes (public playback for donors)
+insert into storage.buckets (id, name, public)
+values ('request-voice-notes', 'request-voice-notes', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Voice notes are publicly readable" on storage.objects;
+create policy "Voice notes are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'request-voice-notes');
+
+drop policy if exists "Authenticated users can upload voice notes" on storage.objects;
+create policy "Authenticated users can upload voice notes"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'request-voice-notes'
+    and auth.uid() is not null
+  );
+
 -- Realtime
 alter publication supabase_realtime add table public.blood_requests;
 alter publication supabase_realtime add table public.donor_profiles;
+
+-- NGO / hospital partner profiles
+create table if not exists public.ngo_profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  name text not null,
+  registration_no text not null,
+  certificate_name text,
+  certificate_url text,
+  address text not null,
+  phone text not null,
+  authorized_person text not null,
+  joined_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.ngo_profiles enable row level security;
+
+create policy "NGO profiles are viewable by everyone"
+  on public.ngo_profiles for select using (true);
+create policy "Users can insert own NGO profile"
+  on public.ngo_profiles for insert with check (auth.uid() = id);
+create policy "Users can update own NGO profile"
+  on public.ngo_profiles for update using (auth.uid() = id);

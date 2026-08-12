@@ -41,6 +41,7 @@ export interface Hospital {
 
 export interface BloodRequest {
   id: string;
+  userId?: string;
   bloodGroup: BloodGroup;
   urgency: UrgencyLevel;
   hospitalId: string;
@@ -49,7 +50,11 @@ export interface BloodRequest {
   contactName: string;
   phone: string;
   units: number;
+  groupUnits?: Partial<Record<BloodGroup, number>>;
   notes?: string;
+  voiceNoteUrl?: string;
+  bloodGroups?: BloodGroup[];
+  patientsCount?: number;
   status: RequestStatus;
   createdAt: string;
   distanceKm?: number;
@@ -79,5 +84,17 @@ export interface DonorProfile {
   trustScore: number;
   livesHelped: number;
   avgResponseMinutes: number;
+  joinedAt: string;
+}
+
+export interface NgoProfile {
+  id: string;
+  name: string;
+  registrationNo: string;
+  certificateName?: string;
+  certificateUrl?: string;
+  address: string;
+  phone: string;
+  authorizedPerson: string;
   joinedAt: string;
 }

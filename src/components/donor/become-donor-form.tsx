@@ -3,24 +3,53 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   Droplets,
   Loader2,
   MapPin,
   Phone,
+  ShieldCheck,
   Sparkles,
   UserRound,
 } from "lucide-react";
+import { MockKycPanel } from "@/components/donor/mock-kyc-panel";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
 import type { BloodGroup } from "@/types";
 
-type PanelTone = "crimson" | "amber" | "teal" | "slate";
+type PanelTone = "crimson" | "amber" | "teal" | "slate" | "indigo";
+
+const DONATION_WAIT_DAYS = 90;
+
+function indianMobileDigits(value: string) {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("91") && digits.length > 10) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
+  return digits.slice(0, 10);
+}
+
+function donationWait(lastDonation: string) {
+  if (!lastDonation) return null;
+  const last = new Date(`${lastDonation}T00:00:00`);
+  if (Number.isNaN(last.getTime())) return null;
+  const eligible = new Date(last);
+  eligible.setDate(eligible.getDate() + DONATION_WAIT_DAYS);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (eligible <= today) return null;
+  return {
+    eligible,
+    days: Math.ceil((eligible.getTime() - today.getTime()) / 86_400_000),
+  };
+}
 
 function StepPanel({
   tone,
   step,
+  stepLabel,
   title,
   icon: Icon,
   delayMs,
@@ -28,6 +57,7 @@ function StepPanel({
 }: {
   tone: PanelTone;
   step: string;
+  stepLabel: string;
   title: string;
   icon: typeof Droplets;
   delayMs: number;
@@ -50,6 +80,8 @@ function StepPanel({
             tone === "teal" && "bg-gradient-to-br from-teal to-teal-deep",
             tone === "slate" &&
               "bg-gradient-to-br from-slate-500 to-slate-800",
+            tone === "indigo" &&
+              "bg-gradient-to-br from-indigo-500 to-violet-700",
           )}
         >
           <Icon className="size-4 sm:size-5" aria-hidden />
@@ -62,9 +94,10 @@ function StepPanel({
               tone === "amber" && "text-amber-700",
               tone === "teal" && "text-teal-deep",
               tone === "slate" && "text-slate-600",
+              tone === "indigo" && "text-indigo-700",
             )}
           >
-            Step {step}
+            {stepLabel} {step}
           </p>
           <h2 className="mt-0.5 font-display text-xl font-extrabold tracking-[-0.03em] text-ink sm:text-2xl">
             {title}
@@ -78,10 +111,12 @@ function StepPanel({
 
 export function BecomeDonorForm() {
   const router = useRouter();
+  const { t, locale } = useLanguage();
   const { user, status } = useAuth();
   const [fullName, setFullName] = useState("");
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | null>(null);
   const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
@@ -92,6 +127,7 @@ export function BecomeDonorForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEdit, setIsEdit] = useState(false);
+  const [kycVerified, setKycVerified] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -112,7 +148,7 @@ export function BecomeDonorForm() {
       setIsEdit(true);
       setFullName(existing.fullName);
       setBloodGroup(existing.bloodGroup);
-      setPhone(existing.phone);
+      setPhone(indianMobileDigits(existing.phone));
       setEmail(existing.email ?? "");
       setCity(existing.city);
       setArea(existing.area);
@@ -131,23 +167,39 @@ export function BecomeDonorForm() {
     setError(null);
 
     if (status !== "authenticated") {
-      setError("Sign in with Google first to save your donor profile.");
+      setError(t("donor.errSignIn"));
       return;
     }
     if (!fullName.trim()) {
-      setError("Add your full name.");
+      setError(t("donor.errName"));
+      return;
+    }
+    const ageNum = age ? Number(age) : NaN;
+    if (!age || ageNum < 18 || ageNum > 65) {
+      setError(t("donor.errAge"));
+      return;
+    }
+    const wait = donationWait(lastDonation);
+    if (wait) {
+      setError(t("donor.errWait"));
       return;
     }
     if (!bloodGroup) {
-      setError("Select your blood group.");
+      setError(t("donor.errGroup"));
       return;
     }
-    if (!phone.trim()) {
-      setError("Add a phone number so hospitals can reach you.");
+    const mobile = indianMobileDigits(phone);
+    if (mobile.length !== 10) {
+      setPhoneTouched(true);
+      setError(t("donor.errPhoneDigits"));
       return;
     }
     if (!city.trim() || !area.trim()) {
-      setError("Add your city and area for nearby matching.");
+      setError(t("donor.errCity"));
+      return;
+    }
+    if (!isEdit && !kycVerified) {
+      setError(t("donor.errKyc"));
       return;
     }
 
@@ -156,7 +208,7 @@ export function BecomeDonorForm() {
       await saveDonorProfile({
         fullName,
         bloodGroup,
-        phone,
+        phone: `+91${mobile}`,
         email,
         city,
         area,
@@ -165,40 +217,57 @@ export function BecomeDonorForm() {
         age: age ? Number(age) : undefined,
         notes,
       });
-      router.push("/profile");
+      router.push("/profile/donor");
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Could not save profile. Check Supabase setup.",
+          : t("donor.errSave"),
       );
       setSubmitting(false);
     }
   }
+
+  const wait = donationWait(lastDonation);
+  const ageNum = age ? Number(age) : NaN;
+  const ageBlocked = Boolean(age) && (ageNum < 18 || ageNum > 65);
+  const restLocked = Boolean(wait) || ageBlocked;
+  const eligibleLabel = wait
+    ? wait.eligible.toLocaleDateString(locale === "hi" ? "hi-IN" : "en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
       <StepPanel
         tone="teal"
         step="01"
-        title="About you"
+        stepLabel={t("donor.step")}
+        title={t("donor.aboutYou")}
         icon={UserRound}
         delayMs={40}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block sm:col-span-2">
-            <span className="text-sm font-bold text-ink">Full name</span>
+            <span className="text-sm font-bold text-ink">
+              {t("donor.fullName")} <span className="text-crimson">*</span>
+            </span>
             <input
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-teal/20 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/25"
-              placeholder="As it appears on your ID"
+              placeholder={t("donor.namePlaceholder")}
               autoComplete="name"
               required
             />
           </label>
           <label className="block">
-            <span className="text-sm font-bold text-ink">Age</span>
+            <span className="text-sm font-bold text-ink">
+              {t("donor.age")} <span className="text-crimson">*</span>
+            </span>
             <input
               type="number"
               min={18}
@@ -207,27 +276,55 @@ export function BecomeDonorForm() {
               onChange={(e) => setAge(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-teal/20 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/25"
               placeholder="18–65"
+              required
             />
           </label>
           <label className="block">
             <span className="text-sm font-bold text-ink">
-              Last donation{" "}
-              <span className="font-normal text-ink-muted">(optional)</span>
+              {t("donor.lastDonation")}{" "}
+              <span className="font-normal text-ink-muted">{t("donor.optional")}</span>
             </span>
             <input
               type="date"
               value={lastDonation}
+              max={new Date().toISOString().slice(0, 10)}
               onChange={(e) => setLastDonation(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-teal/20 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/25"
             />
           </label>
         </div>
+        {wait ? (
+          <div
+            role="alert"
+            className="mt-4 rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3.5"
+          >
+            <p className="flex items-center gap-2 font-display text-lg font-extrabold text-amber-950">
+              <AlertTriangle className="size-5 text-amber-600" aria-hidden />
+              {t("donor.waitTitle")}
+            </p>
+            <p className="mt-1.5 text-sm font-semibold text-amber-900">
+              {t("donor.waitBody", { date: eligibleLabel })}
+            </p>
+            <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-amber-800">
+              {t("donor.waitDays", { n: wait.days })}
+            </p>
+          </div>
+        ) : ageBlocked ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-2xl border border-crimson/30 bg-crimson-soft px-4 py-3 text-sm font-semibold text-crimson-deep"
+          >
+            {t("donor.errAge")}
+          </p>
+        ) : null}
       </StepPanel>
 
+      <fieldset disabled={restLocked} className={cn(restLocked && "pointer-events-none opacity-45")}>
       <StepPanel
         tone="crimson"
         step="02"
-        title="Blood group"
+        stepLabel={t("donor.step")}
+        title={t("donor.bloodGroup")}
         icon={Droplets}
         delayMs={140}
       >
@@ -253,27 +350,50 @@ export function BecomeDonorForm() {
       <StepPanel
         tone="amber"
         step="03"
-        title="Contact"
+        stepLabel={t("donor.step")}
+        title={t("donor.contact")}
         icon={Phone}
         delayMs={240}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-bold text-ink">Phone</span>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-amber-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-300/40"
-              placeholder="+91 …"
-              autoComplete="tel"
-              inputMode="tel"
-              required
-            />
+            <span className="text-sm font-bold text-ink">
+              {t("donor.phone")} <span className="text-crimson">*</span>
+            </span>
+            <div
+              className={cn(
+                "mt-2 flex items-center rounded-2xl border bg-white/95 shadow-sm outline-none transition focus-within:ring-2",
+                phoneTouched && phone.length !== 10
+                  ? "border-crimson focus-within:border-crimson focus-within:ring-crimson/25"
+                  : "border-amber-200 focus-within:border-amber-400 focus-within:ring-amber-300/40",
+              )}
+            >
+              <span className="shrink-0 pl-4 font-display text-base font-extrabold text-ink">
+                +91
+              </span>
+              <input
+                value={phone}
+                onChange={(e) => {
+                  setPhoneTouched(true);
+                  setPhone(indianMobileDigits(e.target.value));
+                }}
+                onBlur={() => setPhoneTouched(true)}
+                className="min-w-0 flex-1 bg-transparent px-3 py-3.5 text-ink outline-none"
+                placeholder="98765 43210"
+                autoComplete="tel"
+                inputMode="numeric"
+                maxLength={10}
+                required
+              />
+            </div>
+            {phoneTouched && phone.length !== 10 ? (
+              <p className="mt-1.5 text-xs font-bold text-crimson">{t("donor.invalid")}</p>
+            ) : null}
           </label>
           <label className="block">
             <span className="text-sm font-bold text-ink">
-              Email{" "}
-              <span className="font-normal text-ink-muted">(optional)</span>
+              {t("donor.email")}{" "}
+              <span className="font-normal text-ink-muted">{t("donor.optional")}</span>
             </span>
             <input
               type="email"
@@ -290,13 +410,16 @@ export function BecomeDonorForm() {
       <StepPanel
         tone="slate"
         step="04"
-        title="Location & availability"
+        stepLabel={t("donor.step")}
+        title={t("donor.locationAvail")}
         icon={MapPin}
         delayMs={340}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-bold text-ink">City</span>
+            <span className="text-sm font-bold text-ink">
+              {t("donor.city")} <span className="text-crimson">*</span>
+            </span>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
@@ -306,7 +429,9 @@ export function BecomeDonorForm() {
             />
           </label>
           <label className="block">
-            <span className="text-sm font-bold text-ink">Area</span>
+            <span className="text-sm font-bold text-ink">
+              {t("donor.area")} <span className="text-crimson">*</span>
+            </span>
             <input
               value={area}
               onChange={(e) => setArea(e.target.value)}
@@ -329,10 +454,10 @@ export function BecomeDonorForm() {
         >
           <span>
             <span className="block font-display text-lg font-extrabold text-ink">
-              {available ? "Available to donate" : "Not available right now"}
+              {available ? t("donor.available") : t("donor.notAvailable")}
             </span>
             <span className="mt-0.5 block text-sm text-ink-muted">
-              Toggle anytime from My Profile.
+              {t("donor.availableHint")}
             </span>
           </span>
           <span
@@ -352,16 +477,28 @@ export function BecomeDonorForm() {
 
         <label className="mt-4 block">
           <span className="text-sm font-bold text-ink">
-            Notes <span className="font-normal text-ink-muted">(optional)</span>
+            {t("donor.notes")} <span className="font-normal text-ink-muted">{t("donor.optional")}</span>
           </span>
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
-            placeholder="Preferred hours, vehicle, etc."
+            placeholder={t("donor.notesPlaceholder")}
           />
         </label>
       </StepPanel>
+
+      <StepPanel
+        tone="indigo"
+        step="05"
+        stepLabel={t("donor.step")}
+        title={t("donor.kyc")}
+        icon={ShieldCheck}
+        delayMs={440}
+      >
+        <MockKycPanel skip={isEdit} onVerifiedChange={setKycVerified} />
+      </StepPanel>
+      </fieldset>
 
       {error ? (
         <p
@@ -374,7 +511,7 @@ export function BecomeDonorForm() {
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || restLocked || (!isEdit && !kycVerified)}
         className="shiny-card group relative inline-flex h-16 w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-r from-[#0f9f7a] to-[#0a6b54] text-lg font-extrabold text-white shadow-[0_20px_44px_-14px_rgba(15,159,122,0.85)] ring-1 ring-white/30 transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-70 sm:w-auto sm:min-w-80 sm:px-12"
       >
         <span
@@ -383,13 +520,13 @@ export function BecomeDonorForm() {
         />
         {submitting ? (
           <>
-            <Loader2 className="relative size-5 animate-spin" /> Saving…
+            <Loader2 className="relative size-5 animate-spin" /> {t("donor.saving")}
           </>
         ) : (
           <>
             <Sparkles className="relative size-5 opacity-95" aria-hidden />
             <span className="relative">
-              {isEdit ? "Save & open My Profile" : "Join & open My Profile"}
+              {isEdit ? t("donor.save") : t("donor.join")}
             </span>
           </>
         )}

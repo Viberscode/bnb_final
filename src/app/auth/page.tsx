@@ -1,22 +1,22 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import AuthClientPage from "./auth-client";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  description: "Sign in to BloodKit with Google.",
-};
+export default async function AuthRoutePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string; callbackUrl?: string; next?: string }>;
+}) {
+  const params = await searchParams;
+  const role = params.role;
+  const next =
+    params.next ||
+    params.callbackUrl ||
+    (role === "donor"
+      ? "/become-donor"
+      : role === "patient"
+        ? "/request-help"
+        : role === "ngo"
+          ? "/profile"
+          : "/");
 
-export default function AuthRoutePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[50vh] items-center justify-center text-ink-muted">
-          Loading sign-in…
-        </div>
-      }
-    >
-      <AuthClientPage />
-    </Suspense>
-  );
+  redirect(`/?signin=1&next=${encodeURIComponent(next)}`);
 }

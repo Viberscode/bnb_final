@@ -10,7 +10,13 @@ import { formatDistance } from "@/lib/geo";
 import { cn } from "@/lib/utils";
 import type { BloodRequest } from "@/types";
 
-export function MyRequestCard({ request }: { request: BloodRequest }) {
+export function MyRequestCard({
+  request,
+  onWatchSearch,
+}: {
+  request: BloodRequest;
+  onWatchSearch?: () => void;
+}) {
   const { t, locale } = useLanguage();
   const created = new Date(request.createdAt).toLocaleString(
     locale === "hi" ? "hi-IN" : "en-IN",
@@ -66,7 +72,16 @@ export function MyRequestCard({ request }: { request: BloodRequest }) {
               ? ` · ${formatDistance(request.distanceKm)}`
               : ""}
           </p>
-          <AssignedDonorLine assignment={request.assignment} />
+          <AssignedDonorLine assignment={request.assignment} viewer="requester" />
+          {onWatchSearch && request.assignment?.status !== "accepted" ? (
+            <button
+              type="button"
+              onClick={onWatchSearch}
+              className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-crimson hover:underline"
+            >
+              {t("match.liveMatch")}
+            </button>
+          ) : null}
           {request.voiceNoteUrl ? (
             <div className="mt-3">
               <VoiceNotePlayer src={request.voiceNoteUrl} compact />

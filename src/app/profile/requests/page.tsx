@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Radio } from "lucide-react";
 import { MyRequestCard } from "@/components/profile/my-request-card";
+import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -23,6 +24,7 @@ export default function MyRequestsPage() {
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
+  const [watchId, setWatchId] = useState<string | null>(null);
   const now = useAssignmentEngine(myRequests, donors);
   const assigned = useMemo(
     () => withAssignments(myRequests, donors),
@@ -138,7 +140,11 @@ export default function MyRequestsPage() {
                     </div>
                   ) : (
                     assigned.map((request) => (
-                      <MyRequestCard key={request.id} request={request} />
+                      <MyRequestCard
+                        key={request.id}
+                        request={request}
+                        onWatchSearch={() => setWatchId(request.id)}
+                      />
                     ))
                   )}
                 </div>
@@ -148,6 +154,17 @@ export default function MyRequestsPage() {
         </div>
       </main>
       <SiteFooter />
+      {watchId
+        ? (() => {
+            const watching = assigned.find((item) => item.id === watchId);
+            return watching ? (
+              <DonorSearchModal
+                request={watching}
+                onClose={() => setWatchId(null)}
+              />
+            ) : null;
+          })()
+        : null}
     </>
   );
 }

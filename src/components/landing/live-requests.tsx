@@ -213,7 +213,10 @@ function RequestCard({
           {t("live.liveStatus")} · {request.status.replace("_", " ")}
         </span>
       </div>
-      <AssignedDonorLine assignment={request.assignment} />
+      <AssignedDonorLine
+        assignment={request.assignment}
+        viewer={isMine ? "requester" : "public"}
+      />
       {canOpen ? (
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">
           {t("live.openDetails")}
@@ -408,8 +411,8 @@ function RequestDetailModal({
           <div className="rounded-2xl border border-teal/25 bg-teal-soft/40 px-4 py-3">
             <AssignedDonorLine
               assignment={request.assignment}
+              viewer={request.assignment?.donorId === donorId ? "donor" : "public"}
               youAreAssigned={request.assignment?.donorId === donorId}
-              showActions={request.assignment?.donorId === donorId}
               onAccept={() => onRespond?.("accept")}
               onDecline={() => onRespond?.("decline")}
             />

@@ -12,19 +12,35 @@ export function AssignedDonorLine({
   youAreAssigned,
   onAccept,
   onDecline,
-  showActions,
+  viewer = "public",
 }: {
   assignment?: DonorAssignment;
   youAreAssigned?: boolean;
   onAccept?: () => void;
   onDecline?: () => void;
-  showActions?: boolean;
+  viewer?: "requester" | "donor" | "public";
 }) {
   const { t } = useLanguage();
   const wait = remainingMs(assignment);
-  const pending = assignment?.status === "pending";
+  const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
   const accepted = assignment?.status === "accepted";
-  const searching = !assignment || assignment.status === "searching";
+  const searching = !assignment || assignment.status === "searching" || !assignment.donorId;
+
+  if (viewer === "requester") {
+    return (
+      <p className="mt-2 text-xs font-semibold text-ink-muted">
+        {accepted
+          ? t("match.searchDone")
+          : pending
+            ? t("match.waiting", { time: formatCountdown(wait) })
+            : t("match.searching")}
+      </p>
+    );
+  }
+
+  if (viewer === "public" || !youAreAssigned) {
+    return null;
+  }
 
   if (searching) {
     return (
@@ -49,11 +65,7 @@ export function AssignedDonorLine({
           accepted ? "text-emerald-700" : "text-teal-deep",
         )}
       >
-        {accepted
-          ? t("match.accepted")
-          : youAreAssigned
-            ? t("match.youAreAssigned")
-            : t("match.assigned")}
+        {accepted ? t("match.accepted") : t("match.youAreAssigned")}
       </p>
       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-ink">
         <HeartHandshake className="size-3.5 text-teal-deep" aria-hidden />
@@ -70,12 +82,10 @@ export function AssignedDonorLine({
       </p>
       {pending ? (
         <p className="mt-1 text-xs font-bold text-crimson">
-          {youAreAssigned
-            ? t("match.respondBy", { time: formatCountdown(wait) })
-            : t("match.waiting", { time: formatCountdown(wait) })}
+          {t("match.respondBy", { time: formatCountdown(wait) })}
         </p>
       ) : null}
-      {showActions && youAreAssigned && pending ? (
+      {pending ? (
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"

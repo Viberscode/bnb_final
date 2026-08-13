@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -21,6 +20,7 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
 import { BloodGroupMark } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
 import { DEMO_HOSPITALS, URGENCY_OPTIONS } from "@/data/demo";
@@ -122,7 +122,6 @@ function StepPanel({
 }
 
 export function RequestHelpForm() {
-  const router = useRouter();
   const { t } = useLanguage();
   const { user, status: authStatus } = useAuth();
   const [patientScope, setPatientScope] = useState<"single" | "multiple" | null>(
@@ -148,6 +147,7 @@ export function RequestHelpForm() {
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [checkingActive, setCheckingActive] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const now = useAssignmentEngine(activeRequest ? [activeRequest] : [], donors);
   const liveActive = useMemo(
     () =>
@@ -210,6 +210,13 @@ export function RequestHelpForm() {
       setDonors(donors);
       setActiveRequest(existing);
       setCheckingActive(false);
+      if (
+        existing &&
+        existing.assignment?.status !== "accepted" &&
+        existing.status !== "cancelled"
+      ) {
+        setSearchOpen(true);
+      }
     }
 
     void check();
@@ -320,9 +327,12 @@ export function RequestHelpForm() {
         voiceNoteUrl,
         distanceKm: selectedHospital.distanceKm,
       });
-      const donors = await fetchAvailableDonors();
-      await startAssignmentForRequest(request, donors);
-      router.push(`/requests?highlight=${request.id}`);
+      const nextDonors = await fetchAvailableDonors();
+      const assigned = await startAssignmentForRequest(request, nextDonors);
+      setDonors(nextDonors);
+      setActiveRequest(assigned ?? request);
+      setSearchOpen(true);
+      setSubmitting(false);
     } catch (err) {
       setError(
         err instanceof Error
@@ -343,6 +353,7 @@ export function RequestHelpForm() {
 
   if (blockedByActive && liveActive) {
     return (
+      <>
       <div className="overflow-hidden rounded-[1.75rem] border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-white to-rose-50 shadow-[0_20px_48px_-20px_rgba(180,83,9,0.45)]">
         <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-white">
           <AlertTriangle className="size-4" aria-hidden />
@@ -398,7 +409,17 @@ export function RequestHelpForm() {
                     {t("request.liveStatus")} · {liveActive.status.replaceAll("_", " ")}
                   </span>
                 </div>
-                <AssignedDonorLine assignment={liveActive.assignment} />
+                <AssignedDonorLine
+                  assignment={liveActive.assignment}
+                  viewer="requester"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-crimson hover:underline"
+                >
+                  {t("match.liveMatch")}
+                </button>
               </div>
             </div>
           </div>
@@ -459,6 +480,13 @@ export function RequestHelpForm() {
           ) : null}
         </div>
       </div>
+      {searchOpen ? (
+        <DonorSearchModal
+          request={liveActive}
+          onClose={() => setSearchOpen(false)}
+        />
+      ) : null}
+      </>
     );
   }
 

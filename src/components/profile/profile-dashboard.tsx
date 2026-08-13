@@ -96,8 +96,8 @@ function MatchCard({
       </p>
       <AssignedDonorLine
         assignment={request.assignment}
+        viewer={request.assignment?.donorId === donorId ? "donor" : "public"}
         youAreAssigned={request.assignment?.donorId === donorId}
-        showActions={request.assignment?.donorId === donorId}
         onAccept={() => onRespond?.(request.id, "accept")}
         onDecline={() => onRespond?.(request.id, "decline")}
       />

@@ -56,9 +56,11 @@ function StatCard({
 function MatchCard({
   request,
   donorId,
+  onRespond,
 }: {
   request: BloodRequest;
   donorId: string;
+  onRespond?: (requestId: string, action: "accept" | "decline") => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -95,6 +97,9 @@ function MatchCard({
       <AssignedDonorLine
         assignment={request.assignment}
         youAreAssigned={request.assignment?.donorId === donorId}
+        showActions={request.assignment?.donorId === donorId}
+        onAccept={() => onRespond?.(request.id, "accept")}
+        onDecline={() => onRespond?.(request.id, "decline")}
       />
     </article>
   );
@@ -104,10 +109,12 @@ export function ProfileDashboard({
   profile,
   onToggle,
   matches,
+  onRespond,
 }: {
   profile: DonorProfile;
   onToggle: (next: boolean) => void;
   matches: BloodRequest[];
+  onRespond?: (requestId: string, action: "accept" | "decline") => void;
 }) {
   const { t, locale } = useLanguage();
   const joined = new Date(profile.joinedAt).toLocaleDateString(
@@ -281,6 +288,7 @@ export function ProfileDashboard({
                   key={request.id}
                   request={request}
                   donorId={profile.id}
+                  onRespond={onRespond}
                 />
               ))
             )}

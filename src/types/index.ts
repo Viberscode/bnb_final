@@ -62,12 +62,23 @@ export interface BloodRequest {
   assignment?: DonorAssignment;
 }
 
+export type AssignmentStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "searching";
+
 export interface DonorAssignment {
   donorId: string;
   donorName: string;
   bloodGroup: BloodGroup;
   donationsCompleted: number;
   distanceKm: number;
+  status: AssignmentStatus;
+  assignedAt: string;
+  expiresAt: string;
+  declinedDonorIds: string[];
 }
 
 export interface UrgencyOption {

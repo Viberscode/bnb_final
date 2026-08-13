@@ -289,9 +289,14 @@ const en = {
   match: {
     assigned: "Assigned donor",
     youAreAssigned: "You are assigned",
-    searching: "Finding the best donor by urgency, distance, and donation history…",
+    searching: "Finding the next donor by urgency, distance, and donation history…",
     donations: "{n} successful donations",
     priority: "Priority: urgency → distance → successful donations",
+    waiting: "Waiting for donor response · {time}",
+    respondBy: "Respond within {time} or the next donor is assigned",
+    accepted: "Donor accepted",
+    accept: "Accept",
+    decline: "Decline",
   },
   donor: {
     badge: "Become a Donor",
@@ -718,9 +723,14 @@ const hi: Messages = {
   match: {
     assigned: "असाइन डोनर",
     youAreAssigned: "आप असाइन हैं",
-    searching: "तात्कालिकता, दूरी और दान इतिहास से सबसे अच्छा डोनर खोजा जा रहा है…",
+    searching: "तात्कालिकता, दूरी और दान इतिहास से अगला डोनर खोजा जा रहा है…",
     donations: "{n} सफल दान",
     priority: "प्राथमिकता: तात्कालिकता → दूरी → सफल दान",
+    waiting: "डोनर जवाब का इंतज़ार · {time}",
+    respondBy: "{time} में जवाब दें, नहीं तो अगला डोनर असाइन होगा",
+    accepted: "डोनर ने स्वीकार किया",
+    accept: "स्वीकार करें",
+    decline: "अस्वीकार करें",
   },
   donor: {
     badge: "डोनर बनें",

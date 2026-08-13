@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Radio } from "lucide-react";
 import { MyRequestCard } from "@/components/profile/my-request-card";
@@ -8,19 +8,26 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   fetchMyLiveRequests,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
-import type { BloodRequest } from "@/types";
+import type { BloodRequest, DonorProfile } from "@/types";
 
 export default function MyRequestsPage() {
   const { user, status } = useAuth();
   const { t } = useLanguage();
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
+  const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
+  const now = useAssignmentEngine(myRequests, donors);
+  const assigned = useMemo(
+    () => withAssignments(myRequests, donors),
+    [myRequests, donors, now],
+  );
 
   useEffect(() => {
     let active = true;
@@ -31,7 +38,8 @@ export default function MyRequestsPage() {
         fetchAvailableDonors(),
       ]);
       if (!active) return;
-      setMyRequests(withAssignments(next, nextDonors));
+      setMyRequests(next);
+      setDonors(nextDonors);
       setReady(true);
     };
 
@@ -109,7 +117,7 @@ export default function MyRequestsPage() {
                 data-tone="crimson"
               >
                 <div className="space-y-3">
-                  {myRequests.length === 0 ? (
+                  {assigned.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-crimson/25 bg-white/70 px-5 py-12 text-center">
                       <span className="mx-auto inline-flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] text-white">
                         <Radio className="size-5" aria-hidden />
@@ -129,7 +137,7 @@ export default function MyRequestsPage() {
                       </Link>
                     </div>
                   ) : (
-                    myRequests.map((request) => (
+                    assigned.map((request) => (
                       <MyRequestCard key={request.id} request={request} />
                     ))
                   )}

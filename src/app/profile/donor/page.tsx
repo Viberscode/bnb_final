@@ -7,7 +7,12 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { rankRequestsForDonor, withAssignments } from "@/lib/donor-assignment";
+import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
+import {
+  rankRequestsForDonor,
+  respondToAssignment,
+  withAssignments,
+} from "@/lib/donor-assignment";
 import {
   fetchAvailableDonors,
   fetchDonorProfile,
@@ -61,13 +66,19 @@ export default function DonorProfilePage() {
     };
   }, [user?.id]);
 
+  const pool = useMemo(
+    () =>
+      profile && !donors.some((donor) => donor.id === profile.id)
+        ? [...donors, profile]
+        : donors,
+    [donors, profile],
+  );
+  const now = useAssignmentEngine(requests, pool);
+
   const matches = useMemo(() => {
     if (!profile) return [];
-    const pool = donors.some((donor) => donor.id === profile.id)
-      ? donors
-      : [...donors, profile];
     return rankRequestsForDonor(withAssignments(requests, pool), profile);
-  }, [profile, requests, donors]);
+  }, [profile, requests, pool, now]);
 
   return (
     <>
@@ -130,6 +141,9 @@ export default function DonorProfilePage() {
               <ProfileDashboard
                 profile={profile}
                 matches={matches}
+                onRespond={(requestId, action) => {
+                  void respondToAssignment(requestId, profile.id, action);
+                }}
                 onToggle={(next) => {
                   void updateDonorAvailability(next).then((updated) => {
                     if (updated) setProfile(updated);

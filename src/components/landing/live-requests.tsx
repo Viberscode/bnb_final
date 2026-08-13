@@ -18,8 +18,13 @@ import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
-import { rankRequestsForDonor, withAssignments } from "@/lib/donor-assignment";
+import {
+  rankRequestsForDonor,
+  respondToAssignment,
+  withAssignments,
+} from "@/lib/donor-assignment";
 import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
@@ -220,10 +225,14 @@ function RequestCard({
 
 function RequestDetailModal({
   request,
+  donorId,
   onClose,
+  onRespond,
 }: {
   request: BloodRequest;
+  donorId?: string;
   onClose: () => void;
+  onRespond?: (action: "accept" | "decline") => void;
 }) {
   const { t } = useLanguage();
   const breakdown = unitsByGroup(request);
@@ -397,7 +406,13 @@ function RequestDetailModal({
           ) : null}
 
           <div className="rounded-2xl border border-teal/25 bg-teal-soft/40 px-4 py-3">
-            <AssignedDonorLine assignment={request.assignment} />
+            <AssignedDonorLine
+              assignment={request.assignment}
+              youAreAssigned={request.assignment?.donorId === donorId}
+              showActions={request.assignment?.donorId === donorId}
+              onAccept={() => onRespond?.("accept")}
+              onDecline={() => onRespond?.("decline")}
+            />
           </div>
         </dl>
 
@@ -435,6 +450,11 @@ export function LiveRequests({
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openRequest, setOpenRequest] = useState<BloodRequest | null>(null);
+  const pool =
+    donor && !donors.some((item) => item.id === donor.id)
+      ? [...donors, donor]
+      : donors;
+  const now = useAssignmentEngine(requests, pool);
 
   useEffect(() => {
     let active = true;
@@ -462,10 +482,6 @@ export function LiveRequests({
   const filterToMatches = Boolean(donor && !showAll);
 
   const sorted = useMemo(() => {
-    const pool =
-      donor && !donors.some((item) => item.id === donor.id)
-        ? [...donors, donor]
-        : donors;
     let list = withAssignments(requests, pool);
     if (filterToMatches && donor) {
       const ranked = rankRequestsForDonor(list, donor);
@@ -484,7 +500,7 @@ export function LiveRequests({
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     });
-  }, [requests, donors, filterToMatches, donor, highlightId]);
+  }, [requests, pool, filterToMatches, donor, highlightId, now]);
 
   const visible = typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 
@@ -632,8 +648,14 @@ export function LiveRequests({
       </div>
       {donor && openRequest ? (
         <RequestDetailModal
-          request={openRequest}
+          request={
+            sorted.find((item) => item.id === openRequest.id) ?? openRequest
+          }
+          donorId={donor.id}
           onClose={() => setOpenRequest(null)}
+          onRespond={(action) => {
+            void respondToAssignment(openRequest.id, donor.id, action);
+          }}
         />
       ) : null}
     </section>

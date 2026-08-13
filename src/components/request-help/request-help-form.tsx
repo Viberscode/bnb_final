@@ -31,12 +31,18 @@ import {
   getNearbyPlaces,
   NEARBY_HOSPITAL_RADIUS_KM,
 } from "@/lib/geo";
-import { withAssignments } from "@/lib/donor-assignment";
+import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
+import { startAssignmentForRequest, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
-import { addLiveRequest, cancelLiveRequest, fetchActiveRequestForUser } from "@/lib/live-requests";
+import {
+  addLiveRequest,
+  cancelLiveRequest,
+  fetchActiveRequestForUser,
+  subscribeLiveRequests,
+} from "@/lib/live-requests";
 import { uploadVoiceNote } from "@/lib/voice-notes";
 import { cn } from "@/lib/utils";
-import type { BloodGroup, BloodRequest, UrgencyLevel } from "@/types";
+import type { BloodGroup, BloodRequest, DonorProfile, UrgencyLevel } from "@/types";
 
 type NearbyHospital = (typeof DEMO_HOSPITALS)[number] & { distanceKm: number };
 type PanelTone = "crimson" | "amber" | "teal" | "slate";
@@ -139,8 +145,17 @@ export function RequestHelpForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeRequest, setActiveRequest] = useState<BloodRequest | null>(null);
+  const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [checkingActive, setCheckingActive] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const now = useAssignmentEngine(activeRequest ? [activeRequest] : [], donors);
+  const liveActive = useMemo(
+    () =>
+      activeRequest
+        ? withAssignments([activeRequest], donors)[0] ?? activeRequest
+        : null,
+    [activeRequest, donors, now],
+  );
 
   const nearby = useMemo<NearbyHospital[]>(() => {
     if (!coords) return [];
@@ -148,7 +163,7 @@ export function RequestHelpForm() {
   }, [coords]);
 
   const selectedHospital = nearby.find((h) => h.id === hospitalId) ?? null;
-  const blockedByActive = Boolean(activeRequest);
+  const blockedByActive = Boolean(liveActive);
 
   function setPeopleAffected(next: number) {
     const count = Math.min(MAX_PEOPLE, Math.max(MIN_PEOPLE, Math.round(next) || MIN_PEOPLE));
@@ -192,15 +207,18 @@ export function RequestHelpForm() {
         fetchAvailableDonors(),
       ]);
       if (!active) return;
-      setActiveRequest(
-        existing ? withAssignments([existing], donors)[0] ?? existing : null,
-      );
+      setDonors(donors);
+      setActiveRequest(existing);
       setCheckingActive(false);
     }
 
     void check();
+    const unsub = subscribeLiveRequests(() => {
+      void check();
+    });
     return () => {
       active = false;
+      unsub();
     };
   }, [user?.id, authStatus]);
 
@@ -302,6 +320,8 @@ export function RequestHelpForm() {
         voiceNoteUrl,
         distanceKm: selectedHospital.distanceKm,
       });
+      const donors = await fetchAvailableDonors();
+      await startAssignmentForRequest(request, donors);
       router.push(`/requests?highlight=${request.id}`);
     } catch (err) {
       setError(
@@ -321,7 +341,7 @@ export function RequestHelpForm() {
     );
   }
 
-  if (blockedByActive && activeRequest) {
+  if (blockedByActive && liveActive) {
     return (
       <div className="overflow-hidden rounded-[1.75rem] border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-white to-rose-50 shadow-[0_20px_48px_-20px_rgba(180,83,9,0.45)]">
         <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-white">
@@ -343,19 +363,19 @@ export function RequestHelpForm() {
 
           <div className="rounded-2xl border-2 border-amber-300 bg-white p-4 shadow-[0_10px_28px_-18px_rgba(180,83,9,0.5)]">
             <div className="flex items-start gap-3.5">
-              <BloodGroupMark request={activeRequest} />
+              <BloodGroupMark request={liveActive} />
               <div className="min-w-0 flex-1">
                 <p className="font-display text-lg font-black tracking-tight text-ink">
-                  {activeRequest.hospitalName}
+                  {liveActive.hospitalName}
                 </p>
                 <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-ink-muted">
                   <MapPin className="size-3.5 shrink-0" aria-hidden />
-                  {activeRequest.hospitalArea}
+                  {liveActive.hospitalArea}
                 </p>
-                {(activeRequest.patientsCount ?? 1) > 1 ? (
+                {(liveActive.patientsCount ?? 1) > 1 ? (
                   <p className="mt-1 text-xs font-bold uppercase tracking-wider text-crimson">
                     {t("request.peopleAffected", {
-                      n: activeRequest.patientsCount ?? 1,
+                      n: liveActive.patientsCount ?? 1,
                     })}
                   </p>
                 ) : null}
@@ -363,22 +383,22 @@ export function RequestHelpForm() {
                   <span
                     className={cn(
                       "rounded-full px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-wider text-white",
-                      activeRequest.urgency === "critical" && "bg-[#c4122f]",
-                      activeRequest.urgency === "urgent" && "bg-amber-500",
-                      activeRequest.urgency === "planned" && "bg-teal",
+                      liveActive.urgency === "critical" && "bg-[#c4122f]",
+                      liveActive.urgency === "urgent" && "bg-amber-500",
+                      liveActive.urgency === "planned" && "bg-teal",
                     )}
                   >
-                    {activeRequest.urgency === "critical"
+                    {liveActive.urgency === "critical"
                       ? t("urgency.critical")
-                      : activeRequest.urgency === "urgent"
+                      : liveActive.urgency === "urgent"
                         ? t("urgency.urgent")
                         : t("urgency.planned")}
                   </span>
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-wider text-emerald-700">
-                    {t("request.liveStatus")} · {activeRequest.status.replaceAll("_", " ")}
+                    {t("request.liveStatus")} · {liveActive.status.replaceAll("_", " ")}
                   </span>
                 </div>
-                <AssignedDonorLine assignment={activeRequest.assignment} />
+                <AssignedDonorLine assignment={liveActive.assignment} />
               </div>
             </div>
           </div>
@@ -388,11 +408,11 @@ export function RequestHelpForm() {
               type="button"
               disabled={cancelling}
               onClick={async () => {
-                if (!activeRequest) return;
+                if (!liveActive) return;
                 setError(null);
                 setCancelling(true);
                 try {
-                  await cancelLiveRequest(activeRequest.id);
+                  await cancelLiveRequest(liveActive.id);
                   setActiveRequest(null);
                 } catch (err) {
                   setError(
@@ -423,7 +443,7 @@ export function RequestHelpForm() {
               <ArrowUpRight className="size-4" aria-hidden />
             </Link>
             <Link
-              href={`/requests?highlight=${activeRequest.id}`}
+              href={`/requests?highlight=${liveActive.id}`}
               className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-ink/10 bg-white px-5 text-sm font-black text-ink hover:bg-black/[0.03]"
             >
               {t("request.openLiveFeed")}

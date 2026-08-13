@@ -145,9 +145,40 @@ create policy "Authenticated users can upload voice notes"
     and auth.uid() is not null
   );
 
+-- Automated donor assignment (priority + timeout + decline)
+create table if not exists public.request_assignments (
+  request_id uuid primary key references public.blood_requests (id) on delete cascade,
+  donor_id uuid,
+  donor_name text,
+  blood_group text,
+  donations_completed integer not null default 0,
+  distance_km numeric,
+  status text not null default 'pending',
+  assigned_at timestamptz not null default now(),
+  expires_at timestamptz not null default now(),
+  declined_donor_ids text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.request_assignments enable row level security;
+
+drop policy if exists "Assignments are viewable by everyone" on public.request_assignments;
+create policy "Assignments are viewable by everyone"
+  on public.request_assignments for select using (true);
+
+drop policy if exists "Authenticated users can write assignments" on public.request_assignments;
+create policy "Authenticated users can write assignments"
+  on public.request_assignments for insert
+  with check (auth.uid() is not null);
+
+drop policy if exists "Authenticated users can update assignments" on public.request_assignments;
+create policy "Authenticated users can update assignments"
+  on public.request_assignments for update using (auth.uid() is not null);
+
 -- Realtime
 alter publication supabase_realtime add table public.blood_requests;
 alter publication supabase_realtime add table public.donor_profiles;
+alter publication supabase_realtime add table public.request_assignments;
 
 -- NGO / hospital partner profiles
 create table if not exists public.ngo_profiles (

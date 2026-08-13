@@ -326,7 +326,11 @@ export async function addLiveRequest(
     throw new Error(error?.message || "Could not create blood request.");
   }
 
-  return mapRow(data as BloodRequestRow);
+  const created = mapRow(data as BloodRequestRow);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(LIVE_REQUESTS_EVENT));
+  }
+  return created;
 }
 
 export async function cancelLiveRequest(requestId: string): Promise<void> {
@@ -356,11 +360,13 @@ export async function cancelLiveRequest(requestId: string): Promise<void> {
 
 /** Subscribe to realtime blood_requests changes. */
 export function subscribeLiveRequests(onChange: () => void) {
-  const supabase = tryCreateClient();
-  if (!supabase) return () => undefined;
+  if (typeof window !== "undefined") {
+    window.addEventListener(LIVE_REQUESTS_EVENT, onChange);
+  }
 
+  const supabase = tryCreateClient();
   const channel = supabase
-    .channel("blood_requests_live")
+    ?.channel("blood_requests_live")
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "blood_requests" },
@@ -369,6 +375,9 @@ export function subscribeLiveRequests(onChange: () => void) {
     .subscribe();
 
   return () => {
-    void supabase.removeChannel(channel);
+    if (typeof window !== "undefined") {
+      window.removeEventListener(LIVE_REQUESTS_EVENT, onChange);
+    }
+    if (supabase && channel) void supabase.removeChannel(channel);
   };
 }

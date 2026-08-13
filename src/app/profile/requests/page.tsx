@@ -8,6 +8,8 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { withAssignments } from "@/lib/donor-assignment";
+import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   fetchMyLiveRequests,
   subscribeLiveRequests,
@@ -24,9 +26,12 @@ export default function MyRequestsPage() {
     let active = true;
 
     const refresh = async () => {
-      const next = await fetchMyLiveRequests(user?.id);
+      const [next, nextDonors] = await Promise.all([
+        fetchMyLiveRequests(user?.id),
+        fetchAvailableDonors(),
+      ]);
       if (!active) return;
-      setMyRequests(next);
+      setMyRequests(withAssignments(next, nextDonors));
       setReady(true);
     };
 

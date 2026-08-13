@@ -17,8 +17,10 @@ import { BloodGroupMark, UnitsNeededLine } from "@/components/request-help/blood
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
-import { donorMatchesRequest, neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
-import { fetchDonorProfile } from "@/lib/donor-profile";
+import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
+import { rankRequestsForDonor, withAssignments } from "@/lib/donor-assignment";
+import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
   subscribeLiveRequests,
@@ -206,6 +208,7 @@ function RequestCard({
           {t("live.liveStatus")} · {request.status.replace("_", " ")}
         </span>
       </div>
+      <AssignedDonorLine assignment={request.assignment} />
       {canOpen ? (
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">
           {t("live.openDetails")}
@@ -392,6 +395,10 @@ function RequestDetailModal({
           {request.voiceNoteUrl ? (
             <VoiceNotePlayer src={request.voiceNoteUrl} />
           ) : null}
+
+          <div className="rounded-2xl border border-teal/25 bg-teal-soft/40 px-4 py-3">
+            <AssignedDonorLine assignment={request.assignment} />
+          </div>
         </dl>
 
         {request.phone ? (
@@ -425,19 +432,22 @@ export function LiveRequests({
   const { t } = useLanguage();
   const { user } = useAuth();
   const [requests, setRequests] = useState<BloodRequest[]>([]);
+  const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openRequest, setOpenRequest] = useState<BloodRequest | null>(null);
 
   useEffect(() => {
     let active = true;
     const refresh = async () => {
-      const [rows, profile] = await Promise.all([
+      const [rows, profile, nextDonors] = await Promise.all([
         fetchLiveRequests(),
         fetchDonorProfile(user?.id),
+        fetchAvailableDonors(),
       ]);
       if (!active) return;
       setRequests(rows);
       setDonor(profile);
+      setDonors(nextDonors);
     };
     void refresh();
     const unsubscribe = subscribeLiveRequests(() => {
@@ -452,22 +462,29 @@ export function LiveRequests({
   const filterToMatches = Boolean(donor && !showAll);
 
   const sorted = useMemo(() => {
-    let list = [...requests];
+    const pool =
+      donor && !donors.some((item) => item.id === donor.id)
+        ? [...donors, donor]
+        : donors;
+    let list = withAssignments(requests, pool);
     if (filterToMatches && donor) {
-      list = list.filter(
-        (r) =>
-          donorMatchesRequest(donor.bloodGroup, r) ||
-          (highlightId && r.id === highlightId),
-      );
+      const ranked = rankRequestsForDonor(list, donor);
+      if (highlightId && !ranked.some((item) => item.id === highlightId)) {
+        const extra = list.find((item) => item.id === highlightId);
+        return extra ? [extra, ...ranked] : ranked;
+      }
+      return ranked;
     }
     return list.sort((a, b) => {
       const urg = urgencyRank(a.urgency) - urgencyRank(b.urgency);
       if (urg !== 0) return urg;
+      const dist = (a.distanceKm ?? 99) - (b.distanceKm ?? 99);
+      if (dist !== 0) return dist;
       return (
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     });
-  }, [requests, filterToMatches, donor, highlightId]);
+  }, [requests, donors, filterToMatches, donor, highlightId]);
 
   const visible = typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 

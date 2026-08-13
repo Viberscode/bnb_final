@@ -7,8 +7,9 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { donorMatchesRequest } from "@/lib/blood-compatibility";
+import { rankRequestsForDonor, withAssignments } from "@/lib/donor-assignment";
 import {
+  fetchAvailableDonors,
   fetchDonorProfile,
   subscribeDonorProfile,
   updateDonorAvailability,
@@ -24,19 +25,22 @@ export default function DonorProfilePage() {
   const { t } = useLanguage();
   const [profile, setProfile] = useState<DonorProfile | null>(null);
   const [requests, setRequests] = useState<BloodRequest[]>([]);
+  const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     const refresh = async () => {
-      const [nextProfile, nextRequests] = await Promise.all([
+      const [nextProfile, nextRequests, nextDonors] = await Promise.all([
         fetchDonorProfile(user?.id),
         fetchLiveRequests(),
+        fetchAvailableDonors(),
       ]);
       if (!active) return;
       setProfile(nextProfile);
       setRequests(nextRequests);
+      setDonors(nextDonors);
       setReady(true);
     };
 
@@ -59,8 +63,11 @@ export default function DonorProfilePage() {
 
   const matches = useMemo(() => {
     if (!profile) return [];
-    return requests.filter((r) => donorMatchesRequest(profile.bloodGroup, r));
-  }, [profile, requests]);
+    const pool = donors.some((donor) => donor.id === profile.id)
+      ? donors
+      : [...donors, profile];
+    return rankRequestsForDonor(withAssignments(requests, pool), profile);
+  }, [profile, requests, donors]);
 
   return (
     <>

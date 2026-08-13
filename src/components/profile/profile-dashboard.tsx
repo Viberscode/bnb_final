@@ -11,6 +11,7 @@ import {
   Phone,
   ShieldCheck,
 } from "lucide-react";
+import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { BloodGroupMark, UnitsNeededLine } from "@/components/request-help/blood-group-mark";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
@@ -52,7 +53,13 @@ function StatCard({
   );
 }
 
-function MatchCard({ request }: { request: BloodRequest }) {
+function MatchCard({
+  request,
+  donorId,
+}: {
+  request: BloodRequest;
+  donorId: string;
+}) {
   const { t } = useLanguage();
   return (
     <article className="rounded-2xl border border-line bg-white/90 p-4 transition hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-md">
@@ -85,6 +92,10 @@ function MatchCard({ request }: { request: BloodRequest }) {
           : ""}{" "}
         · {request.contactName}
       </p>
+      <AssignedDonorLine
+        assignment={request.assignment}
+        youAreAssigned={request.assignment?.donorId === donorId}
+      />
     </article>
   );
 }
@@ -256,6 +267,9 @@ export function ProfileDashboard({
           <p className="mt-1 text-sm text-ink-muted">
             {t("profile.matchesHint", { group: profile.bloodGroup })}
           </p>
+          <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-teal-deep">
+            {t("match.priority")}
+          </p>
           <div className="mt-4 space-y-3">
             {matches.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line bg-white/70 px-4 py-8 text-center text-sm text-ink-muted">
@@ -263,7 +277,11 @@ export function ProfileDashboard({
               </p>
             ) : (
               matches.slice(0, 3).map((request) => (
-                <MatchCard key={request.id} request={request} />
+                <MatchCard
+                  key={request.id}
+                  request={request}
+                  donorId={profile.id}
+                />
               ))
             )}
           </div>

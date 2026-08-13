@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, MapPin } from "lucide-react";
+import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { BloodGroupMark, UnitsNeededLine } from "@/components/request-help/blood-group-mark";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useLanguage } from "@/components/i18n/language-provider";
@@ -65,6 +66,7 @@ export function MyRequestCard({ request }: { request: BloodRequest }) {
               ? ` · ${formatDistance(request.distanceKm)}`
               : ""}
           </p>
+          <AssignedDonorLine assignment={request.assignment} />
           {request.voiceNoteUrl ? (
             <div className="mt-3">
               <VoiceNotePlayer src={request.voiceNoteUrl} compact />

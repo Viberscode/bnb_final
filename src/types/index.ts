@@ -59,6 +59,15 @@ export interface BloodRequest {
   createdAt: string;
   distanceKm?: number;
   isDemo?: boolean;
+  assignment?: DonorAssignment;
+}
+
+export interface DonorAssignment {
+  donorId: string;
+  donorName: string;
+  bloodGroup: BloodGroup;
+  donationsCompleted: number;
+  distanceKm: number;
 }
 
 export interface UrgencyOption {

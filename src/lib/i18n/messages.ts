@@ -54,7 +54,7 @@ const en = {
       "Blood group, urgency, hospital pin — under a minute. SOS if every second counts.",
     match: "Match",
     matchBody:
-      "Nearby compatible donors scored by distance, trust, and live availability — top matches alerted together.",
+      "Donors are assigned by urgency first, then nearest distance, then successful donation history.",
     arrive: "Arrive",
     arriveBody:
       "First acceptor locks in. Track them live. Partner NGOs step in if the clock runs out.",
@@ -282,9 +282,16 @@ const en = {
     editDetails: "Edit details",
     browseLive: "Browse live requests",
     matchesForYou: "Matches for you",
-    matchesHint: "Open requests your {group} can support.",
+    matchesHint: "Open requests your {group} can support, ranked by urgency then distance.",
     noMatchesStandby: "No matching live requests right now. Stay on standby.",
     donorProfile: "Donor profile",
+  },
+  match: {
+    assigned: "Assigned donor",
+    youAreAssigned: "You are assigned",
+    searching: "Finding the best donor by urgency, distance, and donation history…",
+    donations: "{n} successful donations",
+    priority: "Priority: urgency → distance → successful donations",
   },
   donor: {
     badge: "Become a Donor",
@@ -476,7 +483,7 @@ const hi: Messages = {
       "ब्लड ग्रुप, तात्कालिकता, अस्पताल — एक मिनट से कम। हर सेकंड मायने रखे तो SOS।",
     match: "मैच",
     matchBody:
-      "पास के अनुकूल डोनर दूरी, भरोसे और उपलब्धता से चुने जाते हैं — टॉप मैच एक साथ अलर्ट होते हैं।",
+      "डोनर पहले तात्कालिकता, फिर दूरी, फिर सफल दान इतिहास से असाइन होते हैं।",
     arrive: "पहुँचें",
     arriveBody:
       "पहला स्वीकार लॉक होता है। उन्हें लाइव ट्रैक करें। समय निकलने पर पार्टनर एनजीओ आगे आते हैं।",
@@ -704,9 +711,16 @@ const hi: Messages = {
     editDetails: "विवरण बदलें",
     browseLive: "लाइव अनुरोध देखें",
     matchesForYou: "आपके मैच",
-    matchesHint: "खुले अनुरोध जिनकी मदद आपका {group} कर सकता है।",
+    matchesHint: "खुले अनुरोध जिनकी मदद आपका {group} कर सकता है — पहले तात्कालिकता, फिर दूरी।",
     noMatchesStandby: "अभी कोई मैच नहीं। स्टैंडबाय पर रहें।",
     donorProfile: "डोनर प्रोफ़ाइल",
+  },
+  match: {
+    assigned: "असाइन डोनर",
+    youAreAssigned: "आप असाइन हैं",
+    searching: "तात्कालिकता, दूरी और दान इतिहास से सबसे अच्छा डोनर खोजा जा रहा है…",
+    donations: "{n} सफल दान",
+    priority: "प्राथमिकता: तात्कालिकता → दूरी → सफल दान",
   },
   donor: {
     badge: "डोनर बनें",

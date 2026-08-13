@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { BloodGroupMark } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
 import { DEMO_HOSPITALS, URGENCY_OPTIONS } from "@/data/demo";
@@ -30,6 +31,8 @@ import {
   getNearbyPlaces,
   NEARBY_HOSPITAL_RADIUS_KM,
 } from "@/lib/geo";
+import { withAssignments } from "@/lib/donor-assignment";
+import { fetchAvailableDonors } from "@/lib/donor-profile";
 import { addLiveRequest, cancelLiveRequest, fetchActiveRequestForUser } from "@/lib/live-requests";
 import { uploadVoiceNote } from "@/lib/voice-notes";
 import { cn } from "@/lib/utils";
@@ -184,9 +187,14 @@ export function RequestHelpForm() {
       }
 
       setCheckingActive(true);
-      const existing = await fetchActiveRequestForUser(user.id);
+      const [existing, donors] = await Promise.all([
+        fetchActiveRequestForUser(user.id),
+        fetchAvailableDonors(),
+      ]);
       if (!active) return;
-      setActiveRequest(existing);
+      setActiveRequest(
+        existing ? withAssignments([existing], donors)[0] ?? existing : null,
+      );
       setCheckingActive(false);
     }
 
@@ -370,6 +378,7 @@ export function RequestHelpForm() {
                     {t("request.liveStatus")} · {activeRequest.status.replaceAll("_", " ")}
                   </span>
                 </div>
+                <AssignedDonorLine assignment={activeRequest.assignment} />
               </div>
             </div>
           </div>

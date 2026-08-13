@@ -33,7 +33,11 @@ import {
   NEARBY_HOSPITAL_RADIUS_KM,
 } from "@/lib/geo";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import { startAssignmentForRequest, withAssignments } from "@/lib/donor-assignment";
+import {
+  canViewAssignedDonor,
+  startAssignmentForRequest,
+  withAssignments,
+} from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   addLiveRequest,
@@ -150,13 +154,25 @@ export function RequestHelpForm() {
   const [cancelling, setCancelling] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [donorOpen, setDonorOpen] = useState(false);
-  const now = useAssignmentEngine(activeRequest ? [activeRequest] : [], donors);
+  const ownedRequest = useMemo(() => {
+    if (!activeRequest) return null;
+    if (!user?.id || activeRequest.userId) return activeRequest;
+    return { ...activeRequest, userId: user.id };
+  }, [activeRequest, user?.id]);
+  const otherDonors = useMemo(
+    () => (user?.id ? donors.filter((donor) => donor.id !== user.id) : donors),
+    [donors, user?.id],
+  );
+  const now = useAssignmentEngine(ownedRequest ? [ownedRequest] : [], otherDonors);
   const liveActive = useMemo(
     () =>
-      activeRequest
-        ? withAssignments([activeRequest], donors)[0] ?? activeRequest
+      ownedRequest
+        ? withAssignments([ownedRequest], otherDonors)[0] ?? ownedRequest
         : null,
-    [activeRequest, donors, now],
+    [ownedRequest, otherDonors, now],
+  );
+  const showAssignedDonor = Boolean(
+    liveActive && canViewAssignedDonor(liveActive, liveActive.assignment, user?.id),
   );
 
   const nearby = useMemo<NearbyHospital[]>(() => {
@@ -329,10 +345,15 @@ export function RequestHelpForm() {
         voiceNoteUrl,
         distanceKm: selectedHospital.distanceKm,
       });
-      const nextDonors = await fetchAvailableDonors();
-      const assigned = await startAssignmentForRequest(request, nextDonors);
+      const nextDonors = (await fetchAvailableDonors()).filter(
+        (donor) => donor.id !== user?.id,
+      );
+      const owned = user?.id
+        ? { ...request, userId: request.userId ?? user.id }
+        : request;
+      const assigned = await startAssignmentForRequest(owned, nextDonors);
       setDonors(nextDonors);
-      setActiveRequest(assigned ?? request);
+      setActiveRequest(assigned ?? owned);
       setSearchOpen(true);
       setSubmitting(false);
     } catch (err) {
@@ -414,7 +435,9 @@ export function RequestHelpForm() {
                 <AssignedDonorLine
                   assignment={liveActive.assignment}
                   viewer="requester"
-                  onViewDonor={() => setDonorOpen(true)}
+                  onViewDonor={
+                    showAssignedDonor ? () => setDonorOpen(true) : undefined
+                  }
                 />
                 <button
                   type="button"
@@ -487,10 +510,10 @@ export function RequestHelpForm() {
         <DonorSearchModal
           request={liveActive}
           onClose={() => setSearchOpen(false)}
-          onViewDonor={() => setDonorOpen(true)}
+          onViewDonor={showAssignedDonor ? () => setDonorOpen(true) : undefined}
         />
       ) : null}
-      {donorOpen && liveActive.assignment?.donorId ? (
+      {donorOpen && showAssignedDonor && liveActive.assignment?.donorId ? (
         <AssignedDonorDetails
           assignment={liveActive.assignment}
           onClose={() => setDonorOpen(false)}

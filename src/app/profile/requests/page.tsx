@@ -11,7 +11,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import { withAssignments } from "@/lib/donor-assignment";
+import { canViewAssignedDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   fetchMyLiveRequests,
@@ -27,10 +27,23 @@ export default function MyRequestsPage() {
   const [ready, setReady] = useState(false);
   const [watchId, setWatchId] = useState<string | null>(null);
   const [donorRequestId, setDonorRequestId] = useState<string | null>(null);
-  const now = useAssignmentEngine(myRequests, donors);
+  const ownedRequests = useMemo(
+    () =>
+      myRequests.map((request) =>
+        user?.id && !request.userId
+          ? { ...request, userId: user.id }
+          : request,
+      ),
+    [myRequests, user?.id],
+  );
+  const otherDonors = useMemo(
+    () => (user?.id ? donors.filter((donor) => donor.id !== user.id) : donors),
+    [donors, user?.id],
+  );
+  const now = useAssignmentEngine(ownedRequests, otherDonors);
   const assigned = useMemo(
-    () => withAssignments(myRequests, donors),
-    [myRequests, donors, now],
+    () => withAssignments(ownedRequests, otherDonors),
+    [ownedRequests, otherDonors, now],
   );
 
   useEffect(() => {
@@ -146,7 +159,15 @@ export default function MyRequestsPage() {
                         key={request.id}
                         request={request}
                         onWatchSearch={() => setWatchId(request.id)}
-                        onViewDonor={() => setDonorRequestId(request.id)}
+                        onViewDonor={
+                          canViewAssignedDonor(
+                            request,
+                            request.assignment,
+                            user.id,
+                          )
+                            ? () => setDonorRequestId(request.id)
+                            : undefined
+                        }
                       />
                     ))
                   )}
@@ -164,7 +185,11 @@ export default function MyRequestsPage() {
               <DonorSearchModal
                 request={watching}
                 onClose={() => setWatchId(null)}
-                onViewDonor={() => setDonorRequestId(watching.id)}
+                onViewDonor={
+                  canViewAssignedDonor(watching, watching.assignment, user?.id)
+                    ? () => setDonorRequestId(watching.id)
+                    : undefined
+                }
               />
             ) : null;
           })()
@@ -172,7 +197,8 @@ export default function MyRequestsPage() {
       {donorRequestId
         ? (() => {
             const selected = assigned.find((item) => item.id === donorRequestId);
-            return selected?.assignment?.donorId ? (
+            return selected?.assignment?.donorId &&
+              canViewAssignedDonor(selected, selected.assignment, user?.id) ? (
               <AssignedDonorDetails
                 assignment={selected.assignment}
                 onClose={() => setDonorRequestId(null)}

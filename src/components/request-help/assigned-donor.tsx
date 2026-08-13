@@ -34,7 +34,7 @@ export function AssignedDonorLine({
       : pending
         ? t("match.waiting", { time: formatCountdown(wait) })
         : t("match.searching");
-    if ((pending || accepted) && onViewDonor) {
+    if ((pending || accepted) && onViewDonor && assignment?.donorId) {
       return (
         <button
           type="button"

@@ -14,7 +14,7 @@ export const ASSIGNMENT_EVENT = "bloodkit:assignments";
 export const ASSIGNMENT_WAIT_MS = 150_000;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "2";
+const STORAGE_VERSION = "3";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 
@@ -69,7 +69,7 @@ export function rankRequestsForDonor(
   return [...requests]
     .filter(
       (request) =>
-        request.userId !== donor.id &&
+        !isOwnDonor(request, donor) &&
         donorMatchesRequest(donor.bloodGroup, request),
     )
     .sort((a, b) => {
@@ -77,6 +77,48 @@ export function rankRequestsForDonor(
       if (urgency !== 0) return urgency;
       return donorDistanceKm(donor, a) - donorDistanceKm(donor, b);
     });
+}
+
+function digitsOnly(value?: string) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function phonesMatch(a?: string, b?: string) {
+  const left = digitsOnly(a).slice(-10);
+  const right = digitsOnly(b).slice(-10);
+  return Boolean(left && right && left === right);
+}
+
+/** A requester cannot be assigned as their own donor. */
+export function isOwnDonor(
+  request: BloodRequest,
+  donor: Pick<DonorProfile, "id" | "phone">,
+) {
+  if (request.userId && donor.id === request.userId) return true;
+  return phonesMatch(request.phone, donor.phone);
+}
+
+export function isSelfAssignment(
+  request: BloodRequest,
+  assignment?: DonorAssignment,
+  viewerId?: string,
+) {
+  if (!assignment?.donorId) return false;
+  if (request.userId && assignment.donorId === request.userId) return true;
+  if (viewerId && assignment.donorId === viewerId) return true;
+  return false;
+}
+
+export function canViewAssignedDonor(
+  request: BloodRequest,
+  assignment?: DonorAssignment,
+  viewerId?: string,
+) {
+  if (!assignment?.donorId) return false;
+  if (assignment.status !== "pending" && assignment.status !== "accepted") {
+    return false;
+  }
+  return !isSelfAssignment(request, assignment, viewerId);
 }
 
 export function remainingMs(assignment?: DonorAssignment) {
@@ -241,7 +283,7 @@ export function pickNextDonor(
     .filter(
       (donor) =>
         donor.available &&
-        donor.id !== request.userId &&
+        !isOwnDonor(request, donor) &&
         !declinedDonorIds.includes(donor.id) &&
         !takenIds.has(donor.id) &&
         donorMatchesRequest(donor.bloodGroup, request),
@@ -260,6 +302,17 @@ function assignmentFingerprint(assignment?: DonorAssignment) {
   ].join("|");
 }
 
+function assignmentMatchesRequester(
+  request: BloodRequest,
+  assignment: DonorAssignment | undefined,
+  donors: DonorProfile[],
+) {
+  if (!assignment?.donorId) return false;
+  if (isSelfAssignment(request, assignment)) return true;
+  const donor = donors.find((item) => item.id === assignment.donorId);
+  return Boolean(donor && isOwnDonor(request, donor));
+}
+
 function resolveRequestAssignment(
   request: BloodRequest,
   donors: DonorProfile[],
@@ -271,8 +324,10 @@ function resolveRequestAssignment(
   const declined = current?.declinedDonorIds ?? [];
   const taken = busyDonorIds(store, request.id);
 
-  if (current?.donorId && current.donorId === request.userId) {
-    const nextDeclined = [...new Set([...declined, current.donorId])];
+  if (assignmentMatchesRequester(request, current, donors)) {
+    const nextDeclined = [
+      ...new Set([...declined, ...(current?.donorId ? [current.donorId] : [])]),
+    ];
     const next = pickNextDonor(request, donors, nextDeclined, taken);
     return next
       ? makeAssignment(next, request, nextDeclined)
@@ -355,14 +410,14 @@ export function withAssignments(
   const store = readStore();
   let changed = false;
   const resolved = requests.map((request) => {
-    const assignment =
-      store[request.id] ?? resolveRequestAssignment(request, donors, store);
+    const assignment = resolveRequestAssignment(request, donors, store);
     if (
       assignment &&
       assignmentFingerprint(store[request.id]) !== assignmentFingerprint(assignment)
     ) {
       store[request.id] = assignment;
       changed = true;
+      void persistAssignment(request.id, assignment);
     }
     return {
       ...request,

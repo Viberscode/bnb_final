@@ -3,7 +3,11 @@
 import { useEffect } from "react";
 import { CheckCircle2, Loader2, Radio, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { formatCountdown, remainingMs } from "@/lib/donor-assignment";
+import {
+  canViewAssignedDonor,
+  formatCountdown,
+  remainingMs,
+} from "@/lib/donor-assignment";
 import { cn } from "@/lib/utils";
 import type { BloodRequest } from "@/types";
 
@@ -19,6 +23,7 @@ export function DonorSearchModal({
   const { t } = useLanguage();
   const assignment = request.assignment;
   const wait = remainingMs(assignment);
+  const canView = Boolean(onViewDonor) && canViewAssignedDonor(request, assignment);
   const searching =
     !assignment || assignment.status === "searching" || !assignment.donorId;
   const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
@@ -128,7 +133,7 @@ export function DonorSearchModal({
         </div>
 
         <div className="mt-6 rounded-2xl border border-line bg-paper/70 px-4 py-3 text-center">
-          {accepted ? (
+          {accepted && canView ? (
             <button
               type="button"
               onClick={onViewDonor}
@@ -136,6 +141,10 @@ export function DonorSearchModal({
             >
               {t("match.searchDone")}
             </button>
+          ) : accepted ? (
+            <p className="font-display text-xl font-extrabold text-teal-deep">
+              {t("match.searchDone")}
+            </p>
           ) : (
             <>
               <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-ink-muted">
@@ -151,7 +160,7 @@ export function DonorSearchModal({
               <p className="mt-1 text-xs font-semibold text-ink-muted">
                 {t("match.priority")}
               </p>
-              {pending && onViewDonor ? (
+              {pending && canView ? (
                 <button
                   type="button"
                   onClick={onViewDonor}

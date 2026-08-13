@@ -21,6 +21,7 @@ import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
 import {
+  isOwnDonor,
   rankRequestsForDonor,
   respondToAssignment,
   withAssignments,
@@ -618,7 +619,7 @@ export function LiveRequests({
               request={request}
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
-              canOpen={Boolean(donor) && request.userId !== donor?.id}
+              canOpen={Boolean(donor && !isOwnDonor(request, donor))}
               onOpen={() => setOpenRequest(request)}
             />
           ))}

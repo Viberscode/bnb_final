@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MapPin, Phone, X } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
 import { fetchDonorProfile } from "@/lib/donor-profile";
@@ -15,7 +16,11 @@ export function AssignedDonorDetails({
   onClose: () => void;
 }) {
   const { t, locale } = useLanguage();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<DonorProfile | null>(null);
+  const isOwnProfile = Boolean(
+    user?.id && (assignment.donorId === user.id || profile?.id === user.id),
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -26,14 +31,23 @@ export function AssignedDonorDetails({
   }, [onClose]);
 
   useEffect(() => {
+    if (user?.id && assignment.donorId === user.id) {
+      onClose();
+    }
+  }, [assignment.donorId, onClose, user?.id]);
+
+  useEffect(() => {
     let active = true;
+    if (user?.id && assignment.donorId === user.id) return;
     void fetchDonorProfile(assignment.donorId).then((next) => {
       if (active) setProfile(next);
     });
     return () => {
       active = false;
     };
-  }, [assignment.donorId]);
+  }, [assignment.donorId, user?.id]);
+
+  if (isOwnProfile) return null;
 
   const lastDonation = profile?.lastDonation
     ? new Date(profile.lastDonation).toLocaleDateString(

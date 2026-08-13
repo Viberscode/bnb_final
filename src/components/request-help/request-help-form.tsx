@@ -615,12 +615,19 @@ export function RequestHelpForm() {
                 );
               })}
             </div>
-            {patientScope === "multiple" && bloodGroups.length > 0 ? (
+            {bloodGroups.length > 0 ? (
               <div className="mt-3 space-y-2">
-                <p className="text-sm font-bold text-ink">
-                  {t("request.unitsEach")}
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
+                {patientScope === "multiple" ? (
+                  <p className="text-sm font-bold text-ink">
+                    {t("request.unitsEach")}
+                  </p>
+                ) : null}
+                <div
+                  className={cn(
+                    "grid gap-2",
+                    patientScope === "multiple" && "sm:grid-cols-2",
+                  )}
+                >
                   {bloodGroups.map((group) => (
                     <label
                       key={group}
@@ -637,12 +644,21 @@ export function RequestHelpForm() {
                           type="number"
                           min={1}
                           max={10}
-                          value={groupUnits[group] ?? 1}
+                          value={
+                            patientScope === "single"
+                              ? units
+                              : (groupUnits[group] ?? 1)
+                          }
                           onChange={(e) => {
                             const next = Math.min(
                               10,
                               Math.max(1, Number(e.target.value) || 1),
                             );
+                            if (patientScope === "single") {
+                              setUnits(next);
+                              setGroupUnits({ [group]: next });
+                              return;
+                            }
                             setGroupUnits((prev) => ({ ...prev, [group]: next }));
                           }}
                           className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-ink shadow-sm outline-none transition focus:border-crimson/40 focus:ring-2 focus:ring-crimson/25"
@@ -651,18 +667,20 @@ export function RequestHelpForm() {
                     </label>
                   ))}
                 </div>
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-crimson">
-                  {bloodGroups.length}{" "}
-                  {bloodGroups.length > 1
-                    ? t("request.groups")
-                    : t("request.group")}{" "}
-                  · {patientsCount} {t("request.people")} ·{" "}
-                  {bloodGroups.reduce(
-                    (sum, group) => sum + (groupUnits[group] ?? 1),
-                    0,
-                  )}{" "}
-                  {t("request.unitsTotal")}
-                </p>
+                {patientScope === "multiple" ? (
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-crimson">
+                    {bloodGroups.length}{" "}
+                    {bloodGroups.length > 1
+                      ? t("request.groups")
+                      : t("request.group")}{" "}
+                    · {patientsCount} {t("request.people")} ·{" "}
+                    {bloodGroups.reduce(
+                      (sum, group) => sum + (groupUnits[group] ?? 1),
+                      0,
+                    )}{" "}
+                    {t("request.unitsTotal")}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -908,25 +926,7 @@ export function RequestHelpForm() {
             ) : null}
           </label>
         </div>
-        <div
-          className={cn(
-            "mt-4 grid gap-4",
-            patientScope === "multiple" ? "" : "sm:grid-cols-[140px_1fr]",
-          )}
-        >
-          {patientScope === "multiple" ? null : (
-            <label className="block">
-              <span className="text-sm font-bold text-ink">{t("request.units")}</span>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={units}
-                onChange={(e) => setUnits(Number(e.target.value) || 1)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-crimson/40 focus:ring-2 focus:ring-crimson/25"
-              />
-            </label>
-          )}
+        <div className="mt-4">
           <div className="block">
             <label className="text-sm font-bold text-ink" htmlFor="request-notes">
               {t("request.notes")}{" "}

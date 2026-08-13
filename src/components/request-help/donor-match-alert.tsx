@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AssignedRequesterDetails } from "@/components/request-help/assigned-requester-details";
-import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import {
+  isAssignedDonor,
   isOwnDonor,
   respondToAssignment,
-  withAssignments,
+  subscribeAssignments,
+  syncAssignments,
 } from "@/lib/donor-assignment";
 import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
@@ -37,51 +38,78 @@ export function DonorMatchAlert() {
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const pool =
-    donor && !donors.some((item) => item.id === donor.id)
-      ? [...donors, donor]
-      : donors;
-  const now = useAssignmentEngine(requests, pool);
-  const assigned = useMemo(
-    () => withAssignments(requests, pool),
-    [requests, pool, now],
-  );
+  const [tick, setTick] = useState(0);
+
+  const pool = useMemo(() => {
+    if (!donor) return donors;
+    return donors.some((item) => item.id === donor.id)
+      ? donors
+      : [...donors, donor];
+  }, [donor, donors]);
 
   const match = useMemo(() => {
     if (!donor) return null;
     return (
-      assigned.find((request) => {
-        const assignment = request.assignment;
-        return (
-          Boolean(assignment?.donorId) &&
-          assignment?.donorId === donor.id &&
-          (assignment.status === "pending" || assignment.status === "accepted") &&
-          !isOwnDonor(request, donor)
-        );
-      }) ?? null
+      requests.find(
+        (request) =>
+          isAssignedDonor(request, donor.id) && !isOwnDonor(request, donor),
+      ) ?? null
     );
-  }, [assigned, donor]);
+  }, [requests, donor, tick]);
 
   useEffect(() => {
     let active = true;
+
     const refresh = async () => {
+      if (!user?.id) {
+        if (active) {
+          setRequests([]);
+          setDonor(null);
+          setDonors([]);
+        }
+        return;
+      }
+
       const [rows, profile, nextDonors] = await Promise.all([
         fetchLiveRequests(),
-        fetchDonorProfile(user?.id),
+        fetchDonorProfile(user.id),
         fetchAvailableDonors(),
       ]);
       if (!active) return;
-      setRequests(rows);
+
+      const nextPool =
+        profile && !nextDonors.some((item) => item.id === profile.id)
+          ? [...nextDonors, profile]
+          : nextDonors;
+
+      // Donor clients only consume remote matches — never invent new ones.
+      const synced = await syncAssignments(rows, nextPool, {
+        allowCreate: false,
+      });
+
+      if (!active) return;
       setDonor(profile);
       setDonors(nextDonors);
+      setRequests(synced);
+      setTick((value) => value + 1);
     };
+
     void refresh();
-    const unsub = subscribeLiveRequests(() => {
+    const unsubLive = subscribeLiveRequests(() => {
       void refresh();
     });
+    const unsubAssign = subscribeAssignments(() => {
+      void refresh();
+    });
+    const id = window.setInterval(() => {
+      void refresh();
+    }, 2500);
+
     return () => {
       active = false;
-      unsub();
+      unsubLive();
+      unsubAssign();
+      window.clearInterval(id);
     };
   }, [user?.id]);
 
@@ -98,7 +126,7 @@ export function DonorMatchAlert() {
   const openRequest =
     match && openKey && matchKey(match) === openKey ? match : null;
 
-  if (!donor || !openRequest) return null;
+  if (!donor || !openRequest || !openKey) return null;
 
   return (
     <AssignedRequesterDetails
@@ -113,7 +141,9 @@ export function DonorMatchAlert() {
           donor.id,
           "accept",
           openRequest.userId,
-        );
+        ).then(() => {
+          setTick((value) => value + 1);
+        });
       }}
       onDecline={() => {
         rememberDismissed(openKey);

@@ -21,6 +21,8 @@ import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
 import {
+  canRevealContacts,
+  isAssignedDonor,
   isOwnDonor,
   rankRequestsForDonor,
   respondToAssignment,
@@ -93,12 +95,14 @@ function RequestCard({
   highlighted,
   isMine,
   canOpen,
+  revealContact,
   onOpen,
 }: {
   request: BloodRequest;
   highlighted?: boolean;
   isMine?: boolean;
   canOpen?: boolean;
+  revealContact?: boolean;
   onOpen?: () => void;
 }) {
   const { t } = useLanguage();
@@ -199,7 +203,11 @@ function RequestCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3 text-sm">
         <span className="text-ink-muted">
           {t("live.contact")}:{" "}
-          <span className="font-semibold text-ink">{request.contactName}</span>
+          <span className="font-semibold text-ink">
+            {revealContact || isMine
+              ? request.contactName
+              : t("live.contactHidden")}
+          </span>
         </span>
         <span
           className={cn(
@@ -220,7 +228,7 @@ function RequestCard({
       />
       {canOpen ? (
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">
-          {t("live.openDetails")}
+          {revealContact ? t("live.openDetails") : t("live.openNeed")}
         </p>
       ) : null}
     </article>
@@ -241,6 +249,8 @@ function RequestDetailModal({
   const { t } = useLanguage();
   const breakdown = unitsByGroup(request);
   const unitsTotal = totalUnits(request);
+  const assignedToViewer = isAssignedDonor(request, donorId);
+  const revealContact = assignedToViewer;
   const windowLabel =
     request.urgency === "critical"
       ? t("urgency.criticalWindow")
@@ -280,17 +290,22 @@ function RequestDetailModal({
         </button>
 
         <p className="text-xs font-black uppercase tracking-[0.18em] text-crimson">
-          {t("live.requesterDetails")}
+          {revealContact ? t("live.requesterDetails") : t("live.needDetails")}
         </p>
         <h2
           id="request-detail-title"
           className="mt-2 font-display text-3xl font-black tracking-tight text-ink"
         >
-          {request.contactName}
+          {revealContact ? request.contactName : request.hospitalName}
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">
           {t("live.posted")} {timeAgo(request.createdAt, t)}
         </p>
+        {!revealContact ? (
+          <p className="mt-2 text-xs font-semibold text-ink-muted">
+            {t("live.contactAfterMatch")}
+          </p>
+        ) : null}
         <div className="mt-2.5">
           <UrgencyBadge urgency={request.urgency} />
         </div>
@@ -355,7 +370,7 @@ function RequestDetailModal({
               {t("live.phone")}
             </dt>
             <dd className="mt-1">
-              {request.phone ? (
+              {revealContact && request.phone ? (
                 <a
                   href={`tel:${request.phone}`}
                   className="font-display text-lg font-extrabold text-crimson underline-offset-2 hover:underline"
@@ -363,7 +378,9 @@ function RequestDetailModal({
                   {request.phone}
                 </a>
               ) : (
-                <span className="font-semibold text-ink-muted">{t("live.notShared")}</span>
+                <span className="font-semibold text-ink-muted">
+                  {t("live.contactHidden")}
+                </span>
               )}
             </dd>
           </div>
@@ -409,21 +426,20 @@ function RequestDetailModal({
             <VoiceNotePlayer src={request.voiceNoteUrl} />
           ) : null}
 
-          <div className="rounded-2xl border border-teal/25 bg-teal-soft/40 px-4 py-3">
-            <AssignedDonorLine
-              assignment={request.assignment}
-              viewer={request.assignment?.donorId === donorId ? "donor" : "public"}
-              youAreAssigned={
-                request.assignment?.donorId === donorId &&
-                request.userId !== donorId
-              }
-              onAccept={() => onRespond?.("accept")}
-              onDecline={() => onRespond?.("decline")}
-            />
-          </div>
+          {assignedToViewer ? (
+            <div className="rounded-2xl border border-teal/25 bg-teal-soft/40 px-4 py-3">
+              <AssignedDonorLine
+                assignment={request.assignment}
+                viewer="donor"
+                youAreAssigned
+                onAccept={() => onRespond?.("accept")}
+                onDecline={() => onRespond?.("decline")}
+              />
+            </div>
+          ) : null}
         </dl>
 
-        {request.phone ? (
+        {revealContact && request.phone ? (
           <a
             href={`tel:${request.phone}`}
             className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c91833] to-[#8a1024] text-sm font-black uppercase tracking-[0.08em] text-white shadow-[0_14px_28px_-12px_rgba(196,18,47,0.7)]"
@@ -461,7 +477,7 @@ export function LiveRequests({
     donor && !donors.some((item) => item.id === donor.id)
       ? [...donors, donor]
       : donors;
-  const now = useAssignmentEngine(requests, pool);
+  const now = useAssignmentEngine(requests, pool, { allowCreate: false });
 
   useEffect(() => {
     let active = true;
@@ -489,7 +505,7 @@ export function LiveRequests({
   const filterToMatches = Boolean(donor && !showAll);
 
   const sorted = useMemo(() => {
-    let list = withAssignments(requests, pool);
+    let list = withAssignments(requests, pool, { allowCreate: false });
     if (filterToMatches && donor) {
       const ranked = rankRequestsForDonor(list, donor);
       if (highlightId && !ranked.some((item) => item.id === highlightId)) {
@@ -620,6 +636,10 @@ export function LiveRequests({
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
               canOpen={Boolean(donor && !isOwnDonor(request, donor))}
+              revealContact={
+                Boolean(user?.id && canRevealContacts(request, user.id)) ||
+                Boolean(donor && isAssignedDonor(request, donor.id))
+              }
               onOpen={() => setOpenRequest(request)}
             />
           ))}

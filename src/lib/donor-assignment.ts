@@ -14,7 +14,7 @@ export const ASSIGNMENT_EVENT = "bloodkit:assignments";
 export const ASSIGNMENT_WAIT_MS = 150_000;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "4";
+const STORAGE_VERSION = "5";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 
@@ -121,6 +121,33 @@ export function canViewAssignedDonor(
   return !isSelfAssignment(request, assignment, viewerId);
 }
 
+/** Contact (name/phone) only after this viewer is part of the active match. */
+export function canRevealContacts(
+  request: BloodRequest,
+  viewerId?: string | null,
+) {
+  const assignment = request.assignment;
+  if (!assignment?.donorId) return false;
+  if (assignment.status !== "pending" && assignment.status !== "accepted") {
+    return false;
+  }
+  if (viewerId && request.userId && viewerId === request.userId) return true;
+  if (viewerId && assignment.donorId === viewerId) return true;
+  return false;
+}
+
+export function isAssignedDonor(
+  request: BloodRequest,
+  donorId?: string | null,
+) {
+  const assignment = request.assignment;
+  return Boolean(
+    donorId &&
+      assignment?.donorId === donorId &&
+      (assignment.status === "pending" || assignment.status === "accepted"),
+  );
+}
+
 export function remainingMs(assignment?: DonorAssignment) {
   if (!assignment || assignment.status !== "pending") return 0;
   return Math.max(0, new Date(assignment.expiresAt).getTime() - Date.now());
@@ -182,9 +209,12 @@ function toAssignment(row: Record<string, unknown>): DonorAssignment | null {
 }
 
 let remoteAssignmentsReady: boolean | null = null;
+let remoteUnavailableUntil = 0;
 let remoteFetchInFlight: Promise<AssignmentStore> | null = null;
 let lastRemoteFetchAt = 0;
-const REMOTE_FETCH_MS = 8_000;
+let remoteCache: AssignmentStore = {};
+const REMOTE_FETCH_MS = 2_000;
+const REMOTE_RETRY_MS = 20_000;
 
 function isMissingAssignmentsTable(error: {
   code?: string;
@@ -203,29 +233,45 @@ function isMissingAssignmentsTable(error: {
 
 function markAssignmentsRemoteUnavailable() {
   remoteAssignmentsReady = false;
+  remoteUnavailableUntil = Date.now() + REMOTE_RETRY_MS;
 }
 
-async function fetchRemoteStore(): Promise<AssignmentStore> {
-  if (remoteAssignmentsReady === false) return {};
+function canUseRemoteAssignments() {
+  if (remoteAssignmentsReady === false && Date.now() < remoteUnavailableUntil) {
+    return false;
+  }
+  return true;
+}
+
+function readMergedStore(): AssignmentStore {
+  return { ...readStore(), ...remoteCache };
+}
+
+async function fetchRemoteStore(force = false): Promise<AssignmentStore> {
+  if (!canUseRemoteAssignments()) return remoteCache;
   const supabase = tryCreateClient();
-  if (!supabase || !isSupabaseConfigured()) return {};
+  if (!supabase || !isSupabaseConfigured()) return remoteCache;
   if (remoteFetchInFlight) return remoteFetchInFlight;
-  if (Date.now() - lastRemoteFetchAt < REMOTE_FETCH_MS) return {};
+  if (!force && Date.now() - lastRemoteFetchAt < REMOTE_FETCH_MS) {
+    return remoteCache;
+  }
 
   remoteFetchInFlight = (async () => {
     const { data, error } = await supabase.from("request_assignments").select("*");
     lastRemoteFetchAt = Date.now();
     if (error) {
       if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
-      return {};
+      return remoteCache;
     }
     remoteAssignmentsReady = true;
+    remoteUnavailableUntil = 0;
     const next: AssignmentStore = {};
     for (const row of (data ?? []) as Record<string, unknown>[]) {
       const requestId = String(row.request_id ?? "");
       const assignment = toAssignment(row);
       if (requestId && assignment) next[requestId] = assignment;
     }
+    remoteCache = next;
     return next;
   })();
 
@@ -237,7 +283,7 @@ async function fetchRemoteStore(): Promise<AssignmentStore> {
 }
 
 async function persistAssignment(requestId: string, assignment: DonorAssignment) {
-  if (remoteAssignmentsReady === false) return;
+  if (!canUseRemoteAssignments()) return;
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) return;
   const { error } = await supabase.from("request_assignments").upsert(
@@ -256,9 +302,13 @@ async function persistAssignment(requestId: string, assignment: DonorAssignment)
     },
     { onConflict: "request_id" },
   );
-  if (error && isMissingAssignmentsTable(error)) {
-    markAssignmentsRemoteUnavailable();
+  if (error) {
+    if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
+    return;
   }
+  remoteAssignmentsReady = true;
+  remoteCache = { ...remoteCache, [requestId]: assignment };
+  notifyLive();
 }
 
 async function persistRequestStatus(
@@ -362,7 +412,9 @@ function resolveRequestAssignment(
   request: BloodRequest,
   donors: DonorProfile[],
   store: AssignmentStore,
+  options?: { allowCreate?: boolean },
 ): DonorAssignment | undefined {
+  const allowCreate = options?.allowCreate !== false;
   if (!isActiveRequestStatus(request.status)) return store[request.id];
 
   const current = store[request.id];
@@ -370,6 +422,7 @@ function resolveRequestAssignment(
   const taken = busyDonorIds(store, request.id);
 
   if (assignmentMatchesRequester(request, current, donors)) {
+    if (!allowCreate) return searchingAssignment(declined);
     const nextDeclined = [
       ...new Set([...declined, ...(current?.donorId ? [current.donorId] : [])]),
     ];
@@ -383,11 +436,16 @@ function resolveRequestAssignment(
 
   if (current?.status === "pending" && current.donorId) {
     if (remainingMs(current) > 0) return current;
+    if (!allowCreate) return searchingAssignment([...new Set([...declined, current.donorId])]);
     const nextDeclined = [...new Set([...declined, current.donorId])];
     const next = pickNextDonor(request, donors, nextDeclined, taken);
     return next
       ? makeAssignment(next, request, nextDeclined)
       : searchingAssignment(nextDeclined);
+  }
+
+  if (!allowCreate) {
+    return current ?? searchingAssignment(declined);
   }
 
   if (current?.status === "declined" || current?.status === "expired") {
@@ -411,20 +469,24 @@ function resolveRequestAssignment(
 export async function syncAssignments(
   requests: BloodRequest[],
   donors: DonorProfile[],
+  options?: { allowCreate?: boolean },
 ): Promise<BloodRequest[]> {
+  const allowCreate = options?.allowCreate !== false;
   const local = readStore();
-  const remote = await fetchRemoteStore();
+  const remote = await fetchRemoteStore(true);
   const store: AssignmentStore = { ...local, ...remote };
   let changed = false;
 
   const queue = [...requests].sort(compareRequestsByPriority);
   for (const request of queue) {
-    const next = resolveRequestAssignment(request, donors, store);
+    const next = resolveRequestAssignment(request, donors, store, {
+      allowCreate,
+    });
     if (assignmentFingerprint(store[request.id]) !== assignmentFingerprint(next)) {
       changed = true;
       if (next) {
         store[request.id] = next;
-        void persistAssignment(request.id, next);
+        await persistAssignment(request.id, next);
         if (next.status === "pending" && request.status === "pending") {
           void persistRequestStatus(request.id, "matching");
         }
@@ -451,18 +513,22 @@ export async function syncAssignments(
 export function withAssignments(
   requests: BloodRequest[],
   donors: DonorProfile[],
+  options?: { allowCreate?: boolean },
 ): BloodRequest[] {
-  const store = readStore();
+  const allowCreate = options?.allowCreate !== false;
+  const store = readMergedStore();
   let changed = false;
   const resolved = requests.map((request) => {
-    const assignment = resolveRequestAssignment(request, donors, store);
+    const assignment = resolveRequestAssignment(request, donors, store, {
+      allowCreate,
+    });
     if (
       assignment &&
       assignmentFingerprint(store[request.id]) !== assignmentFingerprint(assignment)
     ) {
       store[request.id] = assignment;
       changed = true;
-      void persistAssignment(request.id, assignment);
+      if (allowCreate) void persistAssignment(request.id, assignment);
     }
     return {
       ...request,
@@ -494,7 +560,8 @@ export async function respondToAssignment(
 ) {
   if (requestOwnerId && requestOwnerId === donorId) return;
 
-  const store = readStore();
+  await fetchRemoteStore(true);
+  const store = readMergedStore();
   const current = store[requestId];
   if (!current || current.donorId !== donorId || current.status !== "pending") {
     return;
@@ -529,13 +596,15 @@ export function subscribeAssignments(onChange: () => void) {
 
   const supabase = tryCreateClient();
   const channel =
-    supabase && isSupabaseConfigured() && remoteAssignmentsReady !== false
+    supabase && isSupabaseConfigured() && canUseRemoteAssignments()
       ? supabase
           .channel("request_assignments_live")
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "request_assignments" },
-            () => onChange(),
+            () => {
+              void fetchRemoteStore(true).then(() => onChange());
+            },
           )
           .subscribe()
       : null;

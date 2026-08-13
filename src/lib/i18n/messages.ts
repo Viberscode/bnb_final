@@ -235,6 +235,10 @@ const en = {
     contact: "Contact",
     liveStatus: "Live",
     openDetails: "Open for requester details →",
+    openNeed: "Open need details →",
+    contactHidden: "Hidden until match",
+    contactAfterMatch: "Phone and name are shared only with the assigned donor.",
+    needDetails: "Need details",
   },
   profile: {
     myRequests: "My requests",
@@ -693,6 +697,10 @@ const hi: Messages = {
     contact: "संपर्क",
     liveStatus: "लाइव",
     openDetails: "अनुरोधकर्ता विवरण खोलें →",
+    openNeed: "ज़रूरत का विवरण खोलें →",
+    contactHidden: "मैच होने तक छिपा",
+    contactAfterMatch: "फ़ोन और नाम केवल असाइन डोनर के साथ साझा होते हैं।",
+    needDetails: "ज़रूरत का विवरण",
   },
   profile: {
     myRequests: "मेरे अनुरोध",

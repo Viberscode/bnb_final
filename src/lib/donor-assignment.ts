@@ -181,24 +181,66 @@ function toAssignment(row: Record<string, unknown>): DonorAssignment | null {
   };
 }
 
+let remoteAssignmentsReady: boolean | null = null;
+let remoteFetchInFlight: Promise<AssignmentStore> | null = null;
+let lastRemoteFetchAt = 0;
+const REMOTE_FETCH_MS = 8_000;
+
+function isMissingAssignmentsTable(error: {
+  code?: string;
+  message?: string;
+} | null) {
+  if (!error) return false;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    message.includes("could not find the table") ||
+    message.includes("schema cache") ||
+    message.includes("does not exist")
+  );
+}
+
+function markAssignmentsRemoteUnavailable() {
+  remoteAssignmentsReady = false;
+}
+
 async function fetchRemoteStore(): Promise<AssignmentStore> {
+  if (remoteAssignmentsReady === false) return {};
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) return {};
-  const { data, error } = await supabase.from("request_assignments").select("*");
-  if (error || !data) return {};
-  const next: AssignmentStore = {};
-  for (const row of data as Record<string, unknown>[]) {
-    const requestId = String(row.request_id ?? "");
-    const assignment = toAssignment(row);
-    if (requestId && assignment) next[requestId] = assignment;
+  if (remoteFetchInFlight) return remoteFetchInFlight;
+  if (Date.now() - lastRemoteFetchAt < REMOTE_FETCH_MS) return {};
+
+  remoteFetchInFlight = (async () => {
+    const { data, error } = await supabase.from("request_assignments").select("*");
+    lastRemoteFetchAt = Date.now();
+    if (error) {
+      if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
+      return {};
+    }
+    remoteAssignmentsReady = true;
+    const next: AssignmentStore = {};
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const requestId = String(row.request_id ?? "");
+      const assignment = toAssignment(row);
+      if (requestId && assignment) next[requestId] = assignment;
+    }
+    return next;
+  })();
+
+  try {
+    return await remoteFetchInFlight;
+  } finally {
+    remoteFetchInFlight = null;
   }
-  return next;
 }
 
 async function persistAssignment(requestId: string, assignment: DonorAssignment) {
+  if (remoteAssignmentsReady === false) return;
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) return;
-  await supabase.from("request_assignments").upsert(
+  const { error } = await supabase.from("request_assignments").upsert(
     {
       request_id: requestId,
       donor_id: assignment.donorId || null,
@@ -214,6 +256,9 @@ async function persistAssignment(requestId: string, assignment: DonorAssignment)
     },
     { onConflict: "request_id" },
   );
+  if (error && isMissingAssignmentsTable(error)) {
+    markAssignmentsRemoteUnavailable();
+  }
 }
 
 async function persistRequestStatus(
@@ -484,7 +529,7 @@ export function subscribeAssignments(onChange: () => void) {
 
   const supabase = tryCreateClient();
   const channel =
-    supabase && isSupabaseConfigured()
+    supabase && isSupabaseConfigured() && remoteAssignmentsReady !== false
       ? supabase
           .channel("request_assignments_live")
           .on(

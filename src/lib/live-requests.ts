@@ -363,25 +363,50 @@ export async function cancelLiveRequest(requestId: string): Promise<void> {
 }
 
 /** Subscribe to realtime blood_requests changes. */
+const liveRequestListeners = new Set<() => void>();
+let liveRequestChannel: ReturnType<
+  NonNullable<ReturnType<typeof tryCreateClient>>["channel"]
+> | null = null;
+
+function notifyLiveRequestListeners() {
+  for (const listener of liveRequestListeners) listener();
+}
+
+function ensureLiveRequestChannel() {
+  if (liveRequestChannel) return;
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return;
+
+  liveRequestChannel = supabase
+    .channel(`blood_requests_live_${crypto.randomUUID()}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "blood_requests" },
+      () => notifyLiveRequestListeners(),
+    )
+    .subscribe();
+}
+
+function releaseLiveRequestChannel() {
+  if (liveRequestListeners.size > 0 || !liveRequestChannel) return;
+  const supabase = tryCreateClient();
+  if (supabase) void supabase.removeChannel(liveRequestChannel);
+  liveRequestChannel = null;
+}
+
 export function subscribeLiveRequests(onChange: () => void) {
   if (typeof window !== "undefined") {
     window.addEventListener(LIVE_REQUESTS_EVENT, onChange);
   }
 
-  const supabase = tryCreateClient();
-  const channel = supabase
-    ?.channel("blood_requests_live")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "blood_requests" },
-      () => onChange(),
-    )
-    .subscribe();
+  liveRequestListeners.add(onChange);
+  ensureLiveRequestChannel();
 
   return () => {
     if (typeof window !== "undefined") {
       window.removeEventListener(LIVE_REQUESTS_EVENT, onChange);
     }
-    if (supabase && channel) void supabase.removeChannel(channel);
+    liveRequestListeners.delete(onChange);
+    releaseLiveRequestChannel();
   };
 }

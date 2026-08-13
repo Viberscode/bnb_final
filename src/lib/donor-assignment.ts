@@ -587,6 +587,39 @@ export async function respondToAssignment(
   notifyLive();
 }
 
+const assignmentListeners = new Set<() => void>();
+let assignmentChannel: ReturnType<
+  NonNullable<ReturnType<typeof tryCreateClient>>["channel"]
+> | null = null;
+
+function notifyAssignmentListeners() {
+  for (const listener of assignmentListeners) listener();
+}
+
+function ensureAssignmentChannel() {
+  if (assignmentChannel || !canUseRemoteAssignments()) return;
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return;
+
+  assignmentChannel = supabase
+    .channel(`request_assignments_live_${crypto.randomUUID()}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "request_assignments" },
+      () => {
+        void fetchRemoteStore(true).then(() => notifyAssignmentListeners());
+      },
+    )
+    .subscribe();
+}
+
+function releaseAssignmentChannel() {
+  if (assignmentListeners.size > 0 || !assignmentChannel) return;
+  const supabase = tryCreateClient();
+  if (supabase) void supabase.removeChannel(assignmentChannel);
+  assignmentChannel = null;
+}
+
 export function subscribeAssignments(onChange: () => void) {
   if (typeof window === "undefined") return () => undefined;
 
@@ -594,24 +627,13 @@ export function subscribeAssignments(onChange: () => void) {
   window.addEventListener(ASSIGNMENT_EVENT, onLocal);
   window.addEventListener("storage", onLocal);
 
-  const supabase = tryCreateClient();
-  const channel =
-    supabase && isSupabaseConfigured() && canUseRemoteAssignments()
-      ? supabase
-          .channel("request_assignments_live")
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "request_assignments" },
-            () => {
-              void fetchRemoteStore(true).then(() => onChange());
-            },
-          )
-          .subscribe()
-      : null;
+  assignmentListeners.add(onChange);
+  ensureAssignmentChannel();
 
   return () => {
     window.removeEventListener(ASSIGNMENT_EVENT, onLocal);
     window.removeEventListener("storage", onLocal);
-    if (supabase && channel) void supabase.removeChannel(channel);
+    assignmentListeners.delete(onChange);
+    releaseAssignmentChannel();
   };
 }

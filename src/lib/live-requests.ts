@@ -1,5 +1,6 @@
 import type { BloodRequest, RequestStatus, UrgencyLevel, BloodGroup } from "@/types";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
+import { createdAfterReset } from "@/lib/data-reset";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -170,6 +171,14 @@ export function urgencyRank(urgency: BloodRequest["urgency"]): number {
   return 2;
 }
 
+/** Statuses that still count as an open request (one per user). */
+export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
+  "pending",
+  "matching",
+  "donor_accepted",
+  "donor_enroute",
+];
+
 /** Fetch live requests from Supabase. */
 export async function fetchLiveRequests(): Promise<BloodRequest[]> {
   const supabase = tryCreateClient();
@@ -180,6 +189,7 @@ export async function fetchLiveRequests(): Promise<BloodRequest[]> {
   const { data, error } = await supabase
     .from("blood_requests")
     .select("*")
+    .in("status", ACTIVE_REQUEST_STATUSES)
     .order("created_at", { ascending: false });
 
   if (error || !data) {
@@ -187,16 +197,10 @@ export async function fetchLiveRequests(): Promise<BloodRequest[]> {
     return [];
   }
 
-  return (data as BloodRequestRow[]).map(mapRow);
+  return (data as BloodRequestRow[])
+    .map(mapRow)
+    .filter((request) => createdAfterReset(request.createdAt));
 }
-
-/** Statuses that still count as an open request (one per user). */
-export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
-  "pending",
-  "matching",
-  "donor_accepted",
-  "donor_enroute",
-];
 
 export function isActiveRequestStatus(status: RequestStatus): boolean {
   return ACTIVE_REQUEST_STATUSES.includes(status);
@@ -222,7 +226,9 @@ export async function fetchMyLiveRequests(
     return [];
   }
 
-  return (data as BloodRequestRow[]).map(mapRow);
+  return (data as BloodRequestRow[])
+    .map(mapRow)
+    .filter((request) => createdAfterReset(request.createdAt));
 }
 
 /** Returns the user's current open request, if any. */

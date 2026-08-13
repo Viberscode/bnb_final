@@ -1,4 +1,5 @@
 import type { BloodGroup, DonorProfile } from "@/types";
+import { createdAfterReset } from "@/lib/data-reset";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -59,7 +60,9 @@ export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
     return [];
   }
 
-  return (data as DonorRow[]).map(mapRow);
+  return (data as DonorRow[])
+    .map(mapRow)
+    .filter((donor) => createdAfterReset(donor.joinedAt));
 }
 
 export async function fetchDonorProfile(
@@ -82,7 +85,8 @@ export async function fetchDonorProfile(
     .maybeSingle();
 
   if (error || !data) return null;
-  return mapRow(data as DonorRow);
+  const profile = mapRow(data as DonorRow);
+  return createdAfterReset(profile.joinedAt) ? profile : null;
 }
 
 export async function saveDonorProfile(
@@ -119,6 +123,17 @@ export async function saveDonorProfile(
     throw new Error("Sign in with Google before saving your donor profile.");
   }
 
+  const { data: existingRow } = await supabase
+    .from("donor_profiles")
+    .select("joined_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  const joinedAt = createdAfterReset(
+    (existingRow as { joined_at?: string } | null)?.joined_at,
+  )
+    ? (existingRow as { joined_at: string }).joined_at
+    : new Date().toISOString();
+
   const payload = {
     id: user.id,
     full_name: input.fullName.trim(),
@@ -135,6 +150,7 @@ export async function saveDonorProfile(
     trust_score: input.trustScore ?? 72,
     lives_helped: input.livesHelped ?? 0,
     avg_response_minutes: input.avgResponseMinutes ?? 14,
+    joined_at: joinedAt,
     updated_at: new Date().toISOString(),
   };
 

@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Noto_Sans_Devanagari, Source_Sans_3 } from "next/f
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { LanguageProvider } from "@/components/i18n/language-provider";
 import { SignInPromptRoot } from "@/components/auth/sign-in-prompt-root";
+import { DonorMatchAlert } from "@/components/request-help/donor-match-alert";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -41,7 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col font-sans text-ink">
         <AuthProvider>
           <LanguageProvider>
-            <SignInPromptRoot>{children}</SignInPromptRoot>
+            <SignInPromptRoot>
+              {children}
+              <DonorMatchAlert />
+            </SignInPromptRoot>
           </LanguageProvider>
         </AuthProvider>
       </body>

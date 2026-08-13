@@ -14,7 +14,7 @@ export const ASSIGNMENT_EVENT = "bloodkit:assignments";
 export const ASSIGNMENT_WAIT_MS = 150_000;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "3";
+const STORAGE_VERSION = "4";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 

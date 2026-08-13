@@ -317,6 +317,10 @@ const en = {
     closeDetails: "Close donor details",
     viewDonor: "View assigned donor",
     location: "Location",
+    assignedRequest: "Matched request",
+    closeRequester: "Close requester details",
+    matchAlert: "You were matched with this request",
+    respondNow: "Respond now so the requester is not left waiting",
   },
   donor: {
     badge: "Become a Donor",
@@ -771,6 +775,10 @@ const hi: Messages = {
     closeDetails: "डोनर विवरण बंद करें",
     viewDonor: "असाइन डोनर देखें",
     location: "लोकेशन",
+    assignedRequest: "मैच हुआ अनुरोध",
+    closeRequester: "अनुरोधकर्ता विवरण बंद करें",
+    matchAlert: "आप इस अनुरोध से मैच हुए हैं",
+    respondNow: "अनुरोधकर्ता को इंतज़ार न कराना पड़े, अभी जवाब दें",
   },
   donor: {
     badge: "डोनर बनें",

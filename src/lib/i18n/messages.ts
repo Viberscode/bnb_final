@@ -314,6 +314,9 @@ const en = {
     stepConfirm: "Waiting for donor confirmation",
     realtime: "Updating in real time",
     closeSearch: "Close search",
+    closeDetails: "Close donor details",
+    viewDonor: "View assigned donor",
+    location: "Location",
   },
   donor: {
     badge: "Become a Donor",
@@ -765,6 +768,9 @@ const hi: Messages = {
     stepConfirm: "डोनर की पुष्टि का इंतज़ार",
     realtime: "रियल टाइम में अपडेट",
     closeSearch: "खोज बंद करें",
+    closeDetails: "डोनर विवरण बंद करें",
+    viewDonor: "असाइन डोनर देखें",
+    location: "लोकेशन",
   },
   donor: {
     badge: "डोनर बनें",

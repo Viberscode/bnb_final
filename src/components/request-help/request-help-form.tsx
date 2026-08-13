@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
 import { BloodGroupMark } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
@@ -148,6 +149,7 @@ export function RequestHelpForm() {
   const [checkingActive, setCheckingActive] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [donorOpen, setDonorOpen] = useState(false);
   const now = useAssignmentEngine(activeRequest ? [activeRequest] : [], donors);
   const liveActive = useMemo(
     () =>
@@ -412,6 +414,7 @@ export function RequestHelpForm() {
                 <AssignedDonorLine
                   assignment={liveActive.assignment}
                   viewer="requester"
+                  onViewDonor={() => setDonorOpen(true)}
                 />
                 <button
                   type="button"
@@ -484,6 +487,13 @@ export function RequestHelpForm() {
         <DonorSearchModal
           request={liveActive}
           onClose={() => setSearchOpen(false)}
+          onViewDonor={() => setDonorOpen(true)}
+        />
+      ) : null}
+      {donorOpen && liveActive.assignment?.donorId ? (
+        <AssignedDonorDetails
+          assignment={liveActive.assignment}
+          onClose={() => setDonorOpen(false)}
         />
       ) : null}
       </>

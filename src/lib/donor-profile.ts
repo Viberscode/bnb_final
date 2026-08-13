@@ -1,5 +1,4 @@
 import type { BloodGroup, DonorProfile } from "@/types";
-import { DEMO_DONORS } from "@/data/demo";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -48,7 +47,7 @@ function mapRow(row: DonorRow): DonorProfile {
 export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) {
-    return DEMO_DONORS.filter((donor) => donor.available);
+    return [];
   }
 
   const { data, error } = await supabase
@@ -57,7 +56,7 @@ export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
     .eq("available", true);
 
   if (error || !data?.length) {
-    return DEMO_DONORS.filter((donor) => donor.available);
+    return [];
   }
 
   return (data as DonorRow[]).map(mapRow);

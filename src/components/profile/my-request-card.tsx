@@ -13,9 +13,11 @@ import type { BloodRequest } from "@/types";
 export function MyRequestCard({
   request,
   onWatchSearch,
+  onViewDonor,
 }: {
   request: BloodRequest;
   onWatchSearch?: () => void;
+  onViewDonor?: () => void;
 }) {
   const { t, locale } = useLanguage();
   const created = new Date(request.createdAt).toLocaleString(
@@ -72,7 +74,11 @@ export function MyRequestCard({
               ? ` · ${formatDistance(request.distanceKm)}`
               : ""}
           </p>
-          <AssignedDonorLine assignment={request.assignment} viewer="requester" />
+          <AssignedDonorLine
+            assignment={request.assignment}
+            viewer="requester"
+            onViewDonor={onViewDonor}
+          />
           {onWatchSearch && request.assignment?.status !== "accepted" ? (
             <button
               type="button"

@@ -10,9 +10,11 @@ import type { BloodRequest } from "@/types";
 export function DonorSearchModal({
   request,
   onClose,
+  onViewDonor,
 }: {
   request: BloodRequest;
   onClose: () => void;
+  onViewDonor?: () => void;
 }) {
   const { t } = useLanguage();
   const assignment = request.assignment;
@@ -127,9 +129,13 @@ export function DonorSearchModal({
 
         <div className="mt-6 rounded-2xl border border-line bg-paper/70 px-4 py-3 text-center">
           {accepted ? (
-            <p className="font-display text-xl font-extrabold text-teal-deep">
+            <button
+              type="button"
+              onClick={onViewDonor}
+              className="font-display text-xl font-extrabold text-teal-deep underline-offset-2 hover:underline"
+            >
               {t("match.searchDone")}
-            </p>
+            </button>
           ) : (
             <>
               <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-ink-muted">
@@ -145,6 +151,15 @@ export function DonorSearchModal({
               <p className="mt-1 text-xs font-semibold text-ink-muted">
                 {t("match.priority")}
               </p>
+              {pending && onViewDonor ? (
+                <button
+                  type="button"
+                  onClick={onViewDonor}
+                  className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-teal-deep hover:underline"
+                >
+                  {t("match.viewDonor")}
+                </button>
+              ) : null}
             </>
           )}
         </div>

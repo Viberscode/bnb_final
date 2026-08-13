@@ -11,11 +11,9 @@ import {
   Phone,
   ShieldCheck,
 } from "lucide-react";
-import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
-import { BloodGroupMark, UnitsNeededLine } from "@/components/request-help/blood-group-mark";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
-import type { BloodRequest, DonorProfile } from "@/types";
+import type { DonorProfile } from "@/types";
 
 function StatCard({
   label,
@@ -53,68 +51,12 @@ function StatCard({
   );
 }
 
-function MatchCard({
-  request,
-  donorId,
-  onRespond,
-}: {
-  request: BloodRequest;
-  donorId: string;
-  onRespond?: (requestId: string, action: "accept" | "decline") => void;
-}) {
-  const { t } = useLanguage();
-  return (
-    <article className="rounded-2xl border border-line bg-white/90 p-4 transition hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <BloodGroupMark request={request} size="sm" />
-        <span
-          className={cn(
-            "rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wider",
-            request.urgency === "critical" && "bg-[#fff1f3] text-[#c4122f]",
-            request.urgency === "urgent" && "bg-amber-50 text-amber-800",
-            request.urgency === "planned" && "bg-teal-soft text-teal-deep",
-          )}
-        >
-          {request.urgency === "critical"
-            ? t("urgency.critical")
-            : request.urgency === "urgent"
-              ? t("urgency.urgent")
-              : t("urgency.planned")}
-        </span>
-      </div>
-      <p className="mt-3 font-semibold text-ink">{request.hospitalName}</p>
-      <p className="mt-1 flex items-center gap-1 text-xs text-ink-muted">
-        <MapPin className="size-3" aria-hidden />
-        {request.hospitalArea}
-      </p>
-      <p className="mt-2 text-sm text-ink-muted">
-        <UnitsNeededLine request={request} />
-        {(request.patientsCount ?? 1) > 1
-          ? ` · ${request.patientsCount} ${t("live.people")}`
-          : ""}{" "}
-        · {request.contactName}
-      </p>
-      <AssignedDonorLine
-        assignment={request.assignment}
-        viewer={request.assignment?.donorId === donorId ? "donor" : "public"}
-        youAreAssigned={request.assignment?.donorId === donorId}
-        onAccept={() => onRespond?.(request.id, "accept")}
-        onDecline={() => onRespond?.(request.id, "decline")}
-      />
-    </article>
-  );
-}
-
 export function ProfileDashboard({
   profile,
   onToggle,
-  matches,
-  onRespond,
 }: {
   profile: DonorProfile;
   onToggle: (next: boolean) => void;
-  matches: BloodRequest[];
-  onRespond?: (requestId: string, action: "accept" | "decline") => void;
 }) {
   const { t, locale } = useLanguage();
   const joined = new Date(profile.joinedAt).toLocaleDateString(
@@ -209,8 +151,7 @@ export function ProfileDashboard({
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="request-step-panel p-5 sm:p-6" data-tone="slate">
+      <section className="request-step-panel p-5 sm:p-6" data-tone="slate">
           <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">
             {t("profile.details")}
           </h2>
@@ -262,39 +203,7 @@ export function ProfileDashboard({
               <ArrowUpRight className="size-4" aria-hidden />
             </Link>
           </div>
-        </section>
-
-        <section className="request-step-panel p-5 sm:p-6" data-tone="crimson">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">
-              {t("profile.matchesForYou")}
-            </h2>
-            <Activity className="size-5 text-crimson" aria-hidden />
-          </div>
-          <p className="mt-1 text-sm text-ink-muted">
-            {t("profile.matchesHint", { group: profile.bloodGroup })}
-          </p>
-          <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-teal-deep">
-            {t("match.priority")}
-          </p>
-          <div className="mt-4 space-y-3">
-            {matches.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line bg-white/70 px-4 py-8 text-center text-sm text-ink-muted">
-                {t("profile.noMatchesStandby")}
-              </p>
-            ) : (
-              matches.slice(0, 3).map((request) => (
-                <MatchCard
-                  key={request.id}
-                  request={request}
-                  donorId={profile.id}
-                  onRespond={onRespond}
-                />
-              ))
-            )}
-          </div>
-        </section>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import type { BloodRequest, RequestStatus, UrgencyLevel, BloodGroup } from "@/types";
-import { DEMO_LIVE_REQUESTS } from "@/data/demo";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -171,11 +170,11 @@ export function urgencyRank(urgency: BloodRequest["urgency"]): number {
   return 2;
 }
 
-/** Fetch live requests from Supabase (falls back to demo + local cache). */
+/** Fetch live requests from Supabase. */
 export async function fetchLiveRequests(): Promise<BloodRequest[]> {
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) {
-    return DEMO_LIVE_REQUESTS;
+    return [];
   }
 
   const { data, error } = await supabase
@@ -185,11 +184,10 @@ export async function fetchLiveRequests(): Promise<BloodRequest[]> {
 
   if (error || !data) {
     console.warn("Supabase blood_requests fetch failed:", error?.message);
-    return DEMO_LIVE_REQUESTS;
+    return [];
   }
 
-  const rows = (data as BloodRequestRow[]).map(mapRow);
-  return rows.length > 0 ? rows : DEMO_LIVE_REQUESTS;
+  return (data as BloodRequestRow[]).map(mapRow);
 }
 
 /** Statuses that still count as an open request (one per user). */

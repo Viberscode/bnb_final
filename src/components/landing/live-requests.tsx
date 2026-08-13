@@ -412,7 +412,10 @@ function RequestDetailModal({
             <AssignedDonorLine
               assignment={request.assignment}
               viewer={request.assignment?.donorId === donorId ? "donor" : "public"}
-              youAreAssigned={request.assignment?.donorId === donorId}
+              youAreAssigned={
+                request.assignment?.donorId === donorId &&
+                request.userId !== donorId
+              }
               onAccept={() => onRespond?.("accept")}
               onDecline={() => onRespond?.("decline")}
             />
@@ -615,7 +618,7 @@ export function LiveRequests({
               request={request}
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
-              canOpen={Boolean(donor)}
+              canOpen={Boolean(donor) && request.userId !== donor?.id}
               onOpen={() => setOpenRequest(request)}
             />
           ))}
@@ -657,7 +660,12 @@ export function LiveRequests({
           donorId={donor.id}
           onClose={() => setOpenRequest(null)}
           onRespond={(action) => {
-            void respondToAssignment(openRequest.id, donor.id, action);
+            void respondToAssignment(
+              openRequest.id,
+              donor.id,
+              action,
+              openRequest.userId,
+            );
           }}
         />
       ) : null}

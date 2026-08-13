@@ -1,58 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProfileDashboard } from "@/components/profile/profile-dashboard";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import {
-  rankRequestsForDonor,
-  respondToAssignment,
-  withAssignments,
-} from "@/lib/donor-assignment";
-import {
-  fetchAvailableDonors,
   fetchDonorProfile,
   subscribeDonorProfile,
   updateDonorAvailability,
 } from "@/lib/donor-profile";
-import {
-  fetchLiveRequests,
-  subscribeLiveRequests,
-} from "@/lib/live-requests";
-import type { BloodRequest, DonorProfile } from "@/types";
+import type { DonorProfile } from "@/types";
 
 export default function DonorProfilePage() {
   const { user, status } = useAuth();
   const { t } = useLanguage();
   const [profile, setProfile] = useState<DonorProfile | null>(null);
-  const [requests, setRequests] = useState<BloodRequest[]>([]);
-  const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     const refresh = async () => {
-      const [nextProfile, nextRequests, nextDonors] = await Promise.all([
-        fetchDonorProfile(user?.id),
-        fetchLiveRequests(),
-        fetchAvailableDonors(),
-      ]);
+      const nextProfile = await fetchDonorProfile(user?.id);
       if (!active) return;
       setProfile(nextProfile);
-      setRequests(nextRequests);
-      setDonors(nextDonors);
       setReady(true);
     };
 
     void refresh();
-    const unsubRequests = subscribeLiveRequests(() => {
-      void refresh();
-    });
     const unsubProfile = user?.id
       ? subscribeDonorProfile(user.id, () => {
           void refresh();
@@ -61,24 +39,9 @@ export default function DonorProfilePage() {
 
     return () => {
       active = false;
-      unsubRequests();
       unsubProfile();
     };
   }, [user?.id]);
-
-  const pool = useMemo(
-    () =>
-      profile && !donors.some((donor) => donor.id === profile.id)
-        ? [...donors, profile]
-        : donors,
-    [donors, profile],
-  );
-  const now = useAssignmentEngine(requests, pool);
-
-  const matches = useMemo(() => {
-    if (!profile) return [];
-    return rankRequestsForDonor(withAssignments(requests, pool), profile);
-  }, [profile, requests, pool, now]);
 
   return (
     <>
@@ -140,10 +103,6 @@ export default function DonorProfilePage() {
               </Link>
               <ProfileDashboard
                 profile={profile}
-                matches={matches}
-                onRespond={(requestId, action) => {
-                  void respondToAssignment(requestId, profile.id, action);
-                }}
                 onToggle={(next) => {
                   void updateDonorAvailability(next).then((updated) => {
                     if (updated) setProfile(updated);

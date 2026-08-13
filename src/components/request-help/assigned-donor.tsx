@@ -12,12 +12,14 @@ export function AssignedDonorLine({
   youAreAssigned,
   onAccept,
   onDecline,
+  onViewDonor,
   viewer = "public",
 }: {
   assignment?: DonorAssignment;
   youAreAssigned?: boolean;
   onAccept?: () => void;
   onDecline?: () => void;
+  onViewDonor?: () => void;
   viewer?: "requester" | "donor" | "public";
 }) {
   const { t } = useLanguage();
@@ -27,15 +29,23 @@ export function AssignedDonorLine({
   const searching = !assignment || assignment.status === "searching" || !assignment.donorId;
 
   if (viewer === "requester") {
-    return (
-      <p className="mt-2 text-xs font-semibold text-ink-muted">
-        {accepted
-          ? t("match.searchDone")
-          : pending
-            ? t("match.waiting", { time: formatCountdown(wait) })
-            : t("match.searching")}
-      </p>
-    );
+    const label = accepted
+      ? t("match.searchDone")
+      : pending
+        ? t("match.waiting", { time: formatCountdown(wait) })
+        : t("match.searching");
+    if ((pending || accepted) && onViewDonor) {
+      return (
+        <button
+          type="button"
+          onClick={onViewDonor}
+          className="mt-2 text-left text-xs font-bold text-teal-deep underline-offset-2 hover:underline"
+        >
+          {label} · {t("match.viewDonor")}
+        </button>
+      );
+    }
+    return <p className="mt-2 text-xs font-semibold text-ink-muted">{label}</p>;
   }
 
   if (viewer === "public" || !youAreAssigned) {

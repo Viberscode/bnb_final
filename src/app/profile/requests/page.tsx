@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Radio } from "lucide-react";
 import { MyRequestCard } from "@/components/profile/my-request-card";
+import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -25,6 +26,7 @@ export default function MyRequestsPage() {
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
   const [watchId, setWatchId] = useState<string | null>(null);
+  const [donorRequestId, setDonorRequestId] = useState<string | null>(null);
   const now = useAssignmentEngine(myRequests, donors);
   const assigned = useMemo(
     () => withAssignments(myRequests, donors),
@@ -144,6 +146,7 @@ export default function MyRequestsPage() {
                         key={request.id}
                         request={request}
                         onWatchSearch={() => setWatchId(request.id)}
+                        onViewDonor={() => setDonorRequestId(request.id)}
                       />
                     ))
                   )}
@@ -161,6 +164,18 @@ export default function MyRequestsPage() {
               <DonorSearchModal
                 request={watching}
                 onClose={() => setWatchId(null)}
+                onViewDonor={() => setDonorRequestId(watching.id)}
+              />
+            ) : null;
+          })()
+        : null}
+      {donorRequestId
+        ? (() => {
+            const selected = assigned.find((item) => item.id === donorRequestId);
+            return selected?.assignment?.donorId ? (
+              <AssignedDonorDetails
+                assignment={selected.assignment}
+                onClose={() => setDonorRequestId(null)}
               />
             ) : null;
           })()

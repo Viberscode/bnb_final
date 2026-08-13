@@ -13,6 +13,8 @@ import type {
 export const ASSIGNMENT_EVENT = "bloodkit:assignments";
 export const ASSIGNMENT_WAIT_MS = 150_000;
 const STORAGE_KEY = "bloodkit-assignments";
+const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
+const STORAGE_VERSION = "2";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 
@@ -65,7 +67,11 @@ export function rankRequestsForDonor(
   donor: DonorProfile,
 ): BloodRequest[] {
   return [...requests]
-    .filter((request) => donorMatchesRequest(donor.bloodGroup, request))
+    .filter(
+      (request) =>
+        request.userId !== donor.id &&
+        donorMatchesRequest(donor.bloodGroup, request),
+    )
     .sort((a, b) => {
       const urgency = compareRequestsByPriority(a, b);
       if (urgency !== 0) return urgency;
@@ -88,6 +94,10 @@ export function formatCountdown(ms: number) {
 function readStore(): AssignmentStore {
   if (typeof window === "undefined") return {};
   try {
+    if (window.localStorage.getItem(STORAGE_VERSION_KEY) !== STORAGE_VERSION) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
+    }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as AssignmentStore;
@@ -231,6 +241,7 @@ export function pickNextDonor(
     .filter(
       (donor) =>
         donor.available &&
+        donor.id !== request.userId &&
         !declinedDonorIds.includes(donor.id) &&
         !takenIds.has(donor.id) &&
         donorMatchesRequest(donor.bloodGroup, request),
@@ -259,6 +270,14 @@ function resolveRequestAssignment(
   const current = store[request.id];
   const declined = current?.declinedDonorIds ?? [];
   const taken = busyDonorIds(store, request.id);
+
+  if (current?.donorId && current.donorId === request.userId) {
+    const nextDeclined = [...new Set([...declined, current.donorId])];
+    const next = pickNextDonor(request, donors, nextDeclined, taken);
+    return next
+      ? makeAssignment(next, request, nextDeclined)
+      : searchingAssignment(nextDeclined);
+  }
 
   if (current?.status === "accepted" && current.donorId) return current;
 
@@ -371,7 +390,10 @@ export async function respondToAssignment(
   requestId: string,
   donorId: string,
   action: "accept" | "decline",
+  requestOwnerId?: string,
 ) {
+  if (requestOwnerId && requestOwnerId === donorId) return;
+
   const store = readStore();
   const current = store[requestId];
   if (!current || current.donorId !== donorId || current.status !== "pending") {

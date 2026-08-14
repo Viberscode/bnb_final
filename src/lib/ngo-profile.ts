@@ -9,8 +9,8 @@ type NgoRow = {
   id: string;
   name: string;
   registration_no: string;
-  certificate_name: string | null;
-  certificate_url: string | null;
+  certificate_name?: string | null;
+  certificate_url?: string | null;
   address: string;
   phone: string;
   authorized_person: string;
@@ -50,6 +50,19 @@ function writeLocal(profile: NgoProfile) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(storageKey(profile.id), JSON.stringify(profile));
   window.dispatchEvent(new Event(NGO_PROFILE_EVENT));
+}
+
+export async function fetchRegisteredNgos(): Promise<NgoProfile[]> {
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return [];
+
+  const { data, error } = await supabase
+    .from("ngo_profiles")
+    .select("id, name, registration_no, address, phone, authorized_person, joined_at")
+    .order("name", { ascending: true });
+
+  if (error || !data) return [];
+  return (data as NgoRow[]).map(mapRow);
 }
 
 export async function fetchNgoProfile(

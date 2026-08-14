@@ -10,7 +10,13 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
-import { fetchNgoProfile, subscribeNgoProfile } from "@/lib/ngo-profile";
+import { NgoDirectoryModal } from "@/components/ngo/ngo-directory-modal";
+import {
+  fetchNgoProfile,
+  fetchRegisteredNgos,
+  subscribeNgoProfile,
+} from "@/lib/ngo-profile";
+import type { NgoProfile } from "@/types";
 import { cn } from "@/lib/utils";
 
 function HeartBloodIcon({ className }: { className?: string }) {
@@ -189,6 +195,8 @@ export function LandingHero() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [ngoName, setNgoName] = useState<string | null>(null);
+  const [ngoDirectoryOpen, setNgoDirectoryOpen] = useState(false);
+  const [registeredNgos, setRegisteredNgos] = useState<NgoProfile[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -206,6 +214,16 @@ export function LandingHero() {
       unsub();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchRegisteredNgos().then((list) => {
+      if (active) setRegisteredNgos(list);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section
@@ -246,23 +264,22 @@ export function LandingHero() {
           </div>
 
           <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-3.5 sm:mt-10 sm:max-w-none sm:grid-cols-3 lg:max-w-md lg:grid-cols-1">
-            {ACTIONS.map((action) => (
+            {ACTIONS.filter((action) => !(action.role === "ngo" && ngoName)).map((action) => (
               <button
                 key={action.role}
                 type="button"
                 onClick={() => {
-                  const dest =
-                    action.role === "ngo" && ngoName
-                      ? "/profile/ngo"
-                      : action.href;
-                  if (requireAuth(dest, t(
+                  if (action.role === "ngo") {
+                    void fetchRegisteredNgos().then(setRegisteredNgos);
+                    setNgoDirectoryOpen(true);
+                    return;
+                  }
+                  if (requireAuth(action.href, t(
                     action.role === "patient"
                       ? "auth.requestMessage"
-                      : action.role === "donor"
-                        ? "auth.donorMessage"
-                        : "auth.ngoRegisterMessage",
+                      : "auth.donorMessage",
                   ))) {
-                    router.push(dest);
+                    router.push(action.href);
                   }
                 }}
                 className={cn(
@@ -293,16 +310,14 @@ export function LandingHero() {
                       ? t("hero.requestTitle")
                       : action.role === "donor"
                         ? t("hero.donorTitle")
-                        : ngoName || t("hero.ngoTitle")}
+                        : t("hero.ngoTitle")}
                   </span>
                   <span className="mt-0.5 block text-sm text-white/65">
                     {action.role === "patient"
                       ? t("hero.requestSub")
                       : action.role === "donor"
                         ? t("hero.donorSub")
-                        : ngoName
-                          ? t("hero.ngoRegistered")
-                          : t("hero.ngoSub")}
+                        : t("hero.ngoSub")}
                   </span>
                 </span>
 
@@ -326,6 +341,13 @@ export function LandingHero() {
           <HeroHelpStory className="mt-6" />
         </div>
       </div>
+
+      {ngoDirectoryOpen ? (
+        <NgoDirectoryModal
+          ngos={registeredNgos}
+          onClose={() => setNgoDirectoryOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }

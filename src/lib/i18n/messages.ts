@@ -470,6 +470,10 @@ const en = {
     person: "Authorized person",
     joined: "Registered",
     edit: "Edit details",
+    directoryTitle: "Registered NGOs",
+    directoryBody: "Organisations that have registered themselves on BloodNearby.",
+    closeList: "Close NGO list",
+    noPartners: "No NGOs have registered yet.",
   },
 };
 
@@ -940,6 +944,10 @@ const hi: Messages = {
     person: "अधिकृत व्यक्ति",
     joined: "पंजीकृत",
     edit: "विवरण बदलें",
+    directoryTitle: "पंजीकृत एनजीओ",
+    directoryBody: "BloodNearby पर खुद को रजिस्टर करने वाली संस्थाएँ।",
+    closeList: "एनजीओ सूची बंद करें",
+    noPartners: "अभी कोई एनजीओ रजिस्टर नहीं हुई है।",
   },
 };
 

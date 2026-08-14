@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, Radio, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import {
   canViewAssignedDonor,
+  canShareContactDetails,
   formatCountdown,
   remainingMs,
 } from "@/lib/donor-assignment";
@@ -174,7 +175,7 @@ export function DonorSearchModal({
           )}
         </div>
 
-        {(pending || accepted) && assignment?.donorId ? (
+        {canShareContactDetails(assignment) ? (
           <WhatsAppConnectButton requestId={request.id} className="mt-3" />
         ) : null}
 

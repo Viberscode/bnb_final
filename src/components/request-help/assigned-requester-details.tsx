@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Check, MapPin, Phone, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { neededBloodGroups, totalUnits } from "@/lib/blood-compatibility";
-import { formatCountdown, remainingMs } from "@/lib/donor-assignment";
+import { formatCountdown, remainingMs, canShareContactDetails } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
@@ -25,6 +25,7 @@ export function AssignedRequesterDetails({
   const assignment = request.assignment;
   const wait = remainingMs(assignment);
   const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
+  const contactsOpen = canShareContactDetails(assignment);
   const groups = neededBloodGroups(request).join(" · ");
   const units = totalUnits(request);
   const urgencyLabel =
@@ -71,7 +72,7 @@ export function AssignedRequesterDetails({
           id="assigned-requester-title"
           className="mt-2 font-display text-3xl font-extrabold tracking-tight text-ink"
         >
-          {request.contactName}
+          {contactsOpen ? request.contactName : t("live.needDetails")}
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">
           {groups} · {request.hospitalName}
@@ -90,7 +91,7 @@ export function AssignedRequesterDetails({
 
         <dl className="mt-5 grid gap-2.5 sm:grid-cols-2">
           {[
-            [t("profile.phone"), request.phone || t("live.notShared")],
+            [t("profile.phone"), contactsOpen ? request.phone || t("live.notShared") : t("live.contactHidden")],
             [t("live.hospital"), request.hospitalName],
             [t("match.location"), request.hospitalArea],
             [t("live.bloodGroup"), groups],
@@ -158,7 +159,7 @@ export function AssignedRequesterDetails({
           </div>
         ) : null}
 
-        {request.phone ? (
+        {contactsOpen && request.phone ? (
           <>
             <a
               href={`tel:${request.phone}`}
@@ -169,6 +170,10 @@ export function AssignedRequesterDetails({
             </a>
             <WhatsAppConnectButton requestId={request.id} className="mt-2" />
           </>
+        ) : pending ? (
+          <p className="mt-3 text-center text-xs font-semibold text-ink-muted">
+            {t("live.contactAfterMatch")}
+          </p>
         ) : null}
 
         <p className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted">

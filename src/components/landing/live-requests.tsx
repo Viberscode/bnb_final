@@ -23,6 +23,7 @@ import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
 import {
   canRevealContacts,
+  canShareContactDetails,
   isAssignedDonor,
   isOwnDonor,
   rankRequestsForDonor,
@@ -205,9 +206,7 @@ function RequestCard({
         <span className="text-ink-muted">
           {t("live.contact")}:{" "}
           <span className="font-semibold text-ink">
-            {revealContact || isMine
-              ? request.contactName
-              : t("live.contactHidden")}
+            {revealContact ? request.contactName : t("live.contactHidden")}
           </span>
         </span>
         <span
@@ -252,7 +251,8 @@ function RequestDetailModal({
   const breakdown = unitsByGroup(request);
   const unitsTotal = totalUnits(request);
   const assignedToViewer = isAssignedDonor(request, donorId);
-  const revealContact = assignedToViewer;
+  const revealContact =
+    assignedToViewer && canShareContactDetails(request.assignment);
   const windowLabel =
     request.urgency === "critical"
       ? t("urgency.criticalWindow")
@@ -641,10 +641,9 @@ export function LiveRequests({
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
               canOpen={Boolean(donor && !isOwnDonor(request, donor))}
-              revealContact={
-                Boolean(user?.id && canRevealContacts(request, user.id)) ||
-                Boolean(donor && isAssignedDonor(request, donor.id))
-              }
+              revealContact={Boolean(
+                user?.id && canRevealContacts(request, user.id),
+              )}
               onOpen={() => setOpenRequest(request)}
             />
           ))}

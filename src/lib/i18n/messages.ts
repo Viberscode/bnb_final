@@ -237,7 +237,7 @@ const en = {
     openDetails: "Open for requester details →",
     openNeed: "Open need details →",
     contactHidden: "Hidden until match",
-    contactAfterMatch: "Phone and name are shared only with the assigned donor.",
+    contactAfterMatch: "Phone, name, and WhatsApp are shared only after the donor confirms.",
     needDetails: "Need details",
   },
   profile: {
@@ -702,7 +702,7 @@ const hi: Messages = {
     openDetails: "अनुरोधकर्ता विवरण खोलें →",
     openNeed: "ज़रूरत का विवरण खोलें →",
     contactHidden: "मैच होने तक छिपा",
-    contactAfterMatch: "फ़ोन और नाम केवल असाइन डोनर के साथ साझा होते हैं।",
+    contactAfterMatch: "फ़ोन, नाम और WhatsApp तभी साझा होते हैं जब डोनर पुष्टि कर दे।",
     needDetails: "ज़रूरत का विवरण",
   },
   profile: {

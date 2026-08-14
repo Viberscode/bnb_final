@@ -121,18 +121,19 @@ export function canViewAssignedDonor(
   return !isSelfAssignment(request, assignment, viewerId);
 }
 
-/** Contact (name/phone) only after this viewer is part of the active match. */
+/** Phone / WhatsApp only after a donor has confirmed the match. */
+export function canShareContactDetails(assignment?: DonorAssignment) {
+  return Boolean(assignment?.donorId && assignment.status === "accepted");
+}
+
+/** Contact (name/phone) only after this viewer is part of an accepted match. */
 export function canRevealContacts(
   request: BloodRequest,
   viewerId?: string | null,
 ) {
-  const assignment = request.assignment;
-  if (!assignment?.donorId) return false;
-  if (assignment.status !== "pending" && assignment.status !== "accepted") {
-    return false;
-  }
+  if (!canShareContactDetails(request.assignment)) return false;
   if (viewerId && request.userId && viewerId === request.userId) return true;
-  if (viewerId && assignment.donorId === viewerId) return true;
+  if (viewerId && request.assignment?.donorId === viewerId) return true;
   return false;
 }
 

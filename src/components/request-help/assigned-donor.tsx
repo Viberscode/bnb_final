@@ -2,7 +2,11 @@
 
 import { Check, HeartHandshake, MapPin, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { formatCountdown, remainingMs } from "@/lib/donor-assignment";
+import {
+  canShareContactDetails,
+  formatCountdown,
+  remainingMs,
+} from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { cn } from "@/lib/utils";
@@ -31,10 +35,9 @@ export function AssignedDonorLine({
   const accepted = assignment?.status === "accepted";
   const searching = !assignment || assignment.status === "searching" || !assignment.donorId;
   const matchedRequestId = requestId;
-  const showWhatsApp =
-    Boolean(matchedRequestId) &&
-    (pending || accepted) &&
-    Boolean(assignment?.donorId);
+  const showWhatsApp = Boolean(
+    matchedRequestId && canShareContactDetails(assignment),
+  );
 
   if (viewer === "requester") {
     const label = accepted

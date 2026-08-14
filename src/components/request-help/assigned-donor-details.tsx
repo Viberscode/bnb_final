@@ -5,6 +5,7 @@ import { MapPin, Phone, X } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
+import { canShareContactDetails } from "@/lib/donor-assignment";
 import { fetchDonorProfile } from "@/lib/donor-profile";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import type { DonorAssignment, DonorProfile } from "@/types";
@@ -52,6 +53,7 @@ export function AssignedDonorDetails({
 
   if (isOwnProfile) return null;
 
+  const contactsOpen = canShareContactDetails(assignment);
   const lastDonation = profile?.lastDonation
     ? new Date(profile.lastDonation).toLocaleDateString(
         locale === "hi" ? "hi-IN" : "en-IN",
@@ -96,8 +98,8 @@ export function AssignedDonorDetails({
 
         <dl className="mt-5 grid gap-2.5 sm:grid-cols-2">
           {[
-            [t("profile.phone"), profile?.phone || "—"],
-            [t("profile.email"), profile?.email || "—"],
+            [t("profile.phone"), contactsOpen ? profile?.phone || "—" : t("live.contactHidden")],
+            [t("profile.email"), contactsOpen ? profile?.email || "—" : t("live.contactHidden")],
             [
               t("match.location"),
               profile ? `${profile.area}, ${profile.city}` : "—",
@@ -120,7 +122,7 @@ export function AssignedDonorDetails({
           ))}
         </dl>
 
-        {profile?.phone ? (
+        {contactsOpen && profile?.phone ? (
           <a
             href={`tel:${profile.phone}`}
             className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal to-teal-deep text-sm font-black uppercase tracking-[0.08em] text-white"
@@ -129,10 +131,16 @@ export function AssignedDonorDetails({
             {profile.phone}
           </a>
         ) : null}
-        <WhatsAppConnectButton
-          requestId={requestId}
-          className={profile?.phone ? "mt-2" : "mt-5"}
-        />
+        {contactsOpen ? (
+          <WhatsAppConnectButton
+            requestId={requestId}
+            className={profile?.phone ? "mt-2" : "mt-5"}
+          />
+        ) : (
+          <p className="mt-4 text-center text-xs font-semibold text-ink-muted">
+            {t("live.contactAfterMatch")}
+          </p>
+        )}
 
         {profile ? (
           <p className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted">

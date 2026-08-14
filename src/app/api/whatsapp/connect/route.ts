@@ -52,9 +52,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (assignment.status !== "pending" && assignment.status !== "accepted") {
+  if (assignment.status !== "accepted") {
     return NextResponse.json(
-      { error: "This match is no longer active." },
+      { error: "WhatsApp opens after the donor confirms the match." },
       { status: 403 },
     );
   }

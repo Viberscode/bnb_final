@@ -121,17 +121,18 @@ export function AssignedDonorDetails({
         </dl>
 
         {profile?.phone ? (
-          <>
-            <a
-              href={`tel:${profile.phone}`}
-              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal to-teal-deep text-sm font-black uppercase tracking-[0.08em] text-white"
-            >
-              <Phone className="size-4" aria-hidden />
-              {profile.phone}
-            </a>
-            <WhatsAppConnectButton requestId={requestId} className="mt-2" />
-          </>
+          <a
+            href={`tel:${profile.phone}`}
+            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal to-teal-deep text-sm font-black uppercase tracking-[0.08em] text-white"
+          >
+            <Phone className="size-4" aria-hidden />
+            {profile.phone}
+          </a>
         ) : null}
+        <WhatsAppConnectButton
+          requestId={requestId}
+          className={profile?.phone ? "mt-2" : "mt-5"}
+        />
 
         {profile ? (
           <p className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted">

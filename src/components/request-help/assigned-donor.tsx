@@ -4,6 +4,7 @@ import { Check, HeartHandshake, MapPin, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { formatCountdown, remainingMs } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
+import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { cn } from "@/lib/utils";
 import type { DonorAssignment } from "@/types";
 
@@ -13,6 +14,7 @@ export function AssignedDonorLine({
   onAccept,
   onDecline,
   onViewDonor,
+  requestId,
   viewer = "public",
 }: {
   assignment?: DonorAssignment;
@@ -20,6 +22,7 @@ export function AssignedDonorLine({
   onAccept?: () => void;
   onDecline?: () => void;
   onViewDonor?: () => void;
+  requestId?: string;
   viewer?: "requester" | "donor" | "public";
 }) {
   const { t } = useLanguage();
@@ -27,6 +30,11 @@ export function AssignedDonorLine({
   const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
   const accepted = assignment?.status === "accepted";
   const searching = !assignment || assignment.status === "searching" || !assignment.donorId;
+  const matchedRequestId = requestId;
+  const showWhatsApp =
+    Boolean(matchedRequestId) &&
+    (pending || accepted) &&
+    Boolean(assignment?.donorId);
 
   if (viewer === "requester") {
     const label = accepted
@@ -34,18 +42,24 @@ export function AssignedDonorLine({
       : pending
         ? t("match.waiting", { time: formatCountdown(wait) })
         : t("match.searching");
-    if ((pending || accepted) && onViewDonor && assignment?.donorId) {
-      return (
-        <button
-          type="button"
-          onClick={onViewDonor}
-          className="mt-2 text-left text-xs font-bold text-teal-deep underline-offset-2 hover:underline"
-        >
-          {label} · {t("match.viewDonor")}
-        </button>
-      );
-    }
-    return <p className="mt-2 text-xs font-semibold text-ink-muted">{label}</p>;
+    return (
+      <div className="mt-2">
+        {(pending || accepted) && onViewDonor && assignment?.donorId ? (
+          <button
+            type="button"
+            onClick={onViewDonor}
+            className="text-left text-xs font-bold text-teal-deep underline-offset-2 hover:underline"
+          >
+            {label} · {t("match.viewDonor")}
+          </button>
+        ) : (
+          <p className="text-xs font-semibold text-ink-muted">{label}</p>
+        )}
+        {matchedRequestId && showWhatsApp ? (
+          <WhatsAppConnectButton requestId={matchedRequestId} className="mt-2" />
+        ) : null}
+      </div>
+    );
   }
 
   if (viewer === "public" || !youAreAssigned) {

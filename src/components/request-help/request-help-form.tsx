@@ -435,6 +435,7 @@ export function RequestHelpForm() {
                 <AssignedDonorLine
                   assignment={liveActive.assignment}
                   viewer="requester"
+                  requestId={liveActive.id}
                   onViewDonor={
                     showAssignedDonor ? () => setDonorOpen(true) : undefined
                   }

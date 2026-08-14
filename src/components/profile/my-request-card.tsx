@@ -77,6 +77,7 @@ export function MyRequestCard({
           <AssignedDonorLine
             assignment={request.assignment}
             viewer="requester"
+            requestId={request.id}
             onViewDonor={onViewDonor}
           />
           {onWatchSearch && request.assignment?.status !== "accepted" ? (

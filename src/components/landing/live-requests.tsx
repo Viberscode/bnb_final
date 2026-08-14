@@ -226,6 +226,7 @@ function RequestCard({
       <AssignedDonorLine
         assignment={request.assignment}
         viewer={isMine ? "requester" : "public"}
+        requestId={isMine ? request.id : undefined}
       />
       {canOpen ? (
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">

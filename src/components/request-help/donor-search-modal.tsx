@@ -9,6 +9,7 @@ import {
   remainingMs,
 } from "@/lib/donor-assignment";
 import { cn } from "@/lib/utils";
+import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import type { BloodRequest } from "@/types";
 
 export function DonorSearchModal({
@@ -172,6 +173,10 @@ export function DonorSearchModal({
             </>
           )}
         </div>
+
+        {(pending || accepted) && assignment?.donorId ? (
+          <WhatsAppConnectButton requestId={request.id} className="mt-3" />
+        ) : null}
 
         {!accepted ? (
           <p className="mt-4 flex items-center justify-center gap-2 text-xs font-bold text-ink-muted">

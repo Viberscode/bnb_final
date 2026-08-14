@@ -14,6 +14,7 @@ import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { canViewAssignedDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
+  completeLiveRequest,
   fetchMyLiveRequests,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
@@ -27,6 +28,7 @@ export default function MyRequestsPage() {
   const [ready, setReady] = useState(false);
   const [watchId, setWatchId] = useState<string | null>(null);
   const [donorRequestId, setDonorRequestId] = useState<string | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const ownedRequests = useMemo(
     () =>
       myRequests.map((request) =>
@@ -168,6 +170,14 @@ export default function MyRequestsPage() {
                             ? () => setDonorRequestId(request.id)
                             : undefined
                         }
+                        confirming={completingId === request.id}
+                        onConfirmSolved={() => {
+                          setCompletingId(request.id);
+                          void completeLiveRequest(request.id)
+                            .then(() => fetchMyLiveRequests(user.id))
+                            .then((next) => setMyRequests(next))
+                            .finally(() => setCompletingId(null));
+                        }}
                       />
                     ))
                   )}

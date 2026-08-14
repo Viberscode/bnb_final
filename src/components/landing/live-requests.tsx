@@ -108,26 +108,36 @@ function RequestCard({
   onOpen?: () => void;
 }) {
   const { t } = useLanguage();
+  const done = request.status === "completed";
   return (
     <article
       id={`request-${request.id}`}
       className={cn(
         "group relative overflow-hidden rounded-2xl border bg-white p-5 text-left transition duration-300",
-        highlighted &&
+        done &&
+          "border-emerald-300 bg-emerald-50/70 opacity-70 grayscale-[0.35]",
+        !done &&
+          highlighted &&
           "border-crimson shadow-[0_0_0_2px_rgba(196,18,47,0.25)] ring-2 ring-crimson/20",
-        !highlighted && request.urgency === "critical" &&
+        !done &&
+          !highlighted &&
+          request.urgency === "critical" &&
           "live-request-card--critical border-[#ff2d4a] bg-[#fff7f8]",
-        !highlighted && request.urgency === "urgent" &&
+        !done &&
+          !highlighted &&
+          request.urgency === "urgent" &&
           "live-request-card--urgent border-amber-400 bg-[#fffbeb]",
-        !highlighted && request.urgency === "planned" &&
+        !done &&
+          !highlighted &&
+          request.urgency === "planned" &&
           "live-request-card--planned border-teal/40 bg-[#f4fbfa]",
-        canOpen && "cursor-pointer hover:-translate-y-0.5",
+        canOpen && !done && "cursor-pointer hover:-translate-y-0.5",
       )}
-      role={canOpen ? "button" : undefined}
-      tabIndex={canOpen ? 0 : undefined}
-      onClick={canOpen ? onOpen : undefined}
+      role={canOpen && !done ? "button" : undefined}
+      tabIndex={canOpen && !done ? 0 : undefined}
+      onClick={canOpen && !done ? onOpen : undefined}
       onKeyDown={
-        canOpen
+        canOpen && !done
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -137,7 +147,11 @@ function RequestCard({
           : undefined
       }
     >
-      {isMine ? (
+      {done ? (
+        <span className="absolute inset-x-0 top-0 z-10 flex items-center justify-center bg-emerald-600 py-1.5 text-[0.7rem] font-black uppercase tracking-[0.18em] text-white">
+          {t("live.done")}
+        </span>
+      ) : isMine ? (
         <span className="absolute right-2.5 top-2.5 z-10 rounded-md bg-ink/90 px-1.5 py-0.5 text-[0.55rem] font-black uppercase tracking-[0.12em] text-white">
           {t("live.yours")}
         </span>
@@ -145,17 +159,21 @@ function RequestCard({
       <span
         className={cn(
           "live-siren-bar pointer-events-none absolute inset-x-0 top-0 h-1.5",
-          request.urgency === "critical" &&
+          done && "bg-emerald-500",
+          !done &&
+            request.urgency === "critical" &&
             "bg-gradient-to-r from-[#ff2d4a] via-[#c4122f] to-[#ff2d4a]",
-          request.urgency === "urgent" &&
+          !done &&
+            request.urgency === "urgent" &&
             "bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400",
-          request.urgency === "planned" &&
+          !done &&
+            request.urgency === "planned" &&
             "bg-gradient-to-r from-teal via-emerald-500 to-teal",
         )}
         aria-hidden
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className={cn("flex flex-wrap items-start justify-between gap-3", done && "pt-7")}>
         <div className="flex items-start gap-3">
           <BloodGroupMark request={request} />
           <div>
@@ -212,20 +230,28 @@ function RequestCard({
         <span
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-wider",
-            request.urgency === "critical" &&
+            done && "bg-emerald-100 text-emerald-800",
+            !done &&
+              request.urgency === "critical" &&
               "bg-[#fff1f3] text-[#c4122f]",
-            request.urgency === "urgent" && "bg-amber-100 text-amber-800",
-            request.urgency === "planned" && "bg-teal-soft text-teal-deep",
+            !done && request.urgency === "urgent" && "bg-amber-100 text-amber-800",
+            !done && request.urgency === "planned" && "bg-teal-soft text-teal-deep",
           )}
         >
-          <Radio className="size-3 animate-pulse" aria-hidden />
-          {t("live.liveStatus")} · {request.status.replace("_", " ")}
+          {done ? (
+            t("live.done")
+          ) : (
+            <>
+              <Radio className="size-3 animate-pulse" aria-hidden />
+              {t("live.liveStatus")} · {request.status.replace("_", " ")}
+            </>
+          )}
         </span>
       </div>
       <AssignedDonorLine
         assignment={request.assignment}
-        viewer={isMine ? "requester" : "public"}
-        requestId={isMine ? request.id : undefined}
+        viewer={isMine && !done ? "requester" : "public"}
+        requestId={isMine && !done ? request.id : undefined}
       />
       {canOpen ? (
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">

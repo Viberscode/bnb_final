@@ -189,7 +189,7 @@ export async function fetchLiveRequests(): Promise<BloodRequest[]> {
   const { data, error } = await supabase
     .from("blood_requests")
     .select("*")
-    .in("status", ACTIVE_REQUEST_STATUSES)
+    .in("status", [...ACTIVE_REQUEST_STATUSES, "completed"])
     .order("created_at", { ascending: false });
 
   if (error || !data) {
@@ -359,6 +359,39 @@ export async function cancelLiveRequest(requestId: string): Promise<void> {
 
   if (error) {
     throw new Error(error.message || "Could not cancel this request.");
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(LIVE_REQUESTS_EVENT));
+  }
+}
+
+export async function completeLiveRequest(requestId: string): Promise<void> {
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Sign in to confirm this request.");
+  }
+
+  const { error } = await supabase
+    .from("blood_requests")
+    .update({ status: "completed" })
+    .eq("id", requestId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    throw new Error(error.message || "Could not confirm this request.");
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(LIVE_REQUESTS_EVENT));
   }
 }
 

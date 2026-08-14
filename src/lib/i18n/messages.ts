@@ -177,6 +177,9 @@ const en = {
     errVoice: "Sign in to attach a voice note.",
     errPublish: "Could not publish request. Sign in with Google and check Supabase.",
     errCancel: "Could not cancel this request.",
+    errComplete: "Could not confirm this case as solved.",
+    confirmSolved: "Confirm case solved",
+    confirming: "Confirming…",
     errMaxTypes: "You can select at most {n} blood types — one per person affected.",
     errPeopleRange: "Choose between {min} and {max} people.",
   },
@@ -239,6 +242,7 @@ const en = {
     contactHidden: "Hidden until match",
     contactAfterMatch: "Phone, name, and WhatsApp are shared only after the donor confirms.",
     needDetails: "Need details",
+    done: "Done",
   },
   profile: {
     myRequests: "My requests",
@@ -328,6 +332,7 @@ const en = {
     whatsapp: "Connect on WhatsApp",
     whatsappSending: "Opening WhatsApp…",
     whatsappError: "Could not start WhatsApp. Try again.",
+    confirmSolved: "Confirm case solved",
   },
   donor: {
     badge: "Become a Donor",
@@ -642,6 +647,9 @@ const hi: Messages = {
     errVoice: "वॉइस नोट जोड़ने के लिए साइन इन करें।",
     errPublish: "अनुरोध पब्लिश नहीं हो सका। Google से साइन इन करें।",
     errCancel: "यह अनुरोध रद्द नहीं हो सका।",
+    errComplete: "इस केस को हल हुआ चिह्नित नहीं किया जा सका।",
+    confirmSolved: "केस हल होने की पुष्टि करें",
+    confirming: "पुष्टि हो रही है…",
     errMaxTypes: "आप अधिकतम {n} ब्लड टाइप चुन सकते हैं — प्रभावित हर व्यक्ति के लिए एक।",
     errPeopleRange: "{min} से {max} लोगों के बीच चुनें।",
   },
@@ -704,6 +712,7 @@ const hi: Messages = {
     contactHidden: "मैच होने तक छिपा",
     contactAfterMatch: "फ़ोन, नाम और WhatsApp तभी साझा होते हैं जब डोनर पुष्टि कर दे।",
     needDetails: "ज़रूरत का विवरण",
+    done: "हो गया",
   },
   profile: {
     myRequests: "मेरे अनुरोध",
@@ -793,6 +802,7 @@ const hi: Messages = {
     whatsapp: "WhatsApp पर जुड़ें",
     whatsappSending: "WhatsApp खुल रहा है…",
     whatsappError: "WhatsApp शुरू नहीं हो सका। फिर कोशिश करें।",
+    confirmSolved: "केस हल होने की पुष्टि करें",
   },
   donor: {
     badge: "डोनर बनें",

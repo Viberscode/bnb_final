@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
+  Check,
   Clock3,
   Droplets,
   Hospital as HospitalIcon,
@@ -33,15 +34,12 @@ import {
   NEARBY_HOSPITAL_RADIUS_KM,
 } from "@/lib/geo";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import {
-  canViewAssignedDonor,
-  startAssignmentForRequest,
-  withAssignments,
-} from "@/lib/donor-assignment";
+import { canViewAssignedDonor, canShareContactDetails, startAssignmentForRequest, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   addLiveRequest,
   cancelLiveRequest,
+  completeLiveRequest,
   fetchActiveRequestForUser,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
@@ -152,6 +150,7 @@ export function RequestHelpForm() {
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [checkingActive, setCheckingActive] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [donorOpen, setDonorOpen] = useState(false);
   const ownedRequest = useMemo(() => {
@@ -496,6 +495,41 @@ export function RequestHelpForm() {
             >
               {t("request.openLiveFeed")}
             </Link>
+            {canShareContactDetails(liveActive.assignment) ? (
+              <button
+                type="button"
+                disabled={completing}
+                onClick={async () => {
+                  setError(null);
+                  setCompleting(true);
+                  try {
+                    await completeLiveRequest(liveActive.id);
+                    setActiveRequest(null);
+                  } catch (err) {
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : t("request.errComplete"),
+                    );
+                  } finally {
+                    setCompleting(false);
+                  }
+                }}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black uppercase tracking-[0.06em] text-white shadow-[0_14px_28px_-12px_rgba(5,150,105,0.7)] hover:bg-emerald-700 disabled:opacity-70"
+              >
+                {completing ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    {t("request.confirming")}
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-4" aria-hidden />
+                    {t("request.confirmSolved")}
+                  </>
+                )}
+              </button>
+            ) : null}
           </div>
           {error ? (
             <p

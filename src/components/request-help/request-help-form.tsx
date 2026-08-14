@@ -516,6 +516,7 @@ export function RequestHelpForm() {
       {donorOpen && showAssignedDonor && liveActive.assignment?.donorId ? (
         <AssignedDonorDetails
           assignment={liveActive.assignment}
+          requestId={liveActive.id}
           onClose={() => setDonorOpen(false)}
         />
       ) : null}

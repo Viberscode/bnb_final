@@ -6,13 +6,16 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
 import { fetchDonorProfile } from "@/lib/donor-profile";
+import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import type { DonorAssignment, DonorProfile } from "@/types";
 
 export function AssignedDonorDetails({
   assignment,
+  requestId,
   onClose,
 }: {
   assignment: DonorAssignment;
+  requestId: string;
   onClose: () => void;
 }) {
   const { t, locale } = useLanguage();
@@ -118,13 +121,16 @@ export function AssignedDonorDetails({
         </dl>
 
         {profile?.phone ? (
-          <a
-            href={`tel:${profile.phone}`}
-            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal to-teal-deep text-sm font-black uppercase tracking-[0.08em] text-white"
-          >
-            <Phone className="size-4" aria-hidden />
-            {profile.phone}
-          </a>
+          <>
+            <a
+              href={`tel:${profile.phone}`}
+              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal to-teal-deep text-sm font-black uppercase tracking-[0.08em] text-white"
+            >
+              <Phone className="size-4" aria-hidden />
+              {profile.phone}
+            </a>
+            <WhatsAppConnectButton requestId={requestId} className="mt-2" />
+          </>
         ) : null}
 
         {profile ? (

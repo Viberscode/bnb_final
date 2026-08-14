@@ -325,6 +325,9 @@ const en = {
     closeRequester: "Close requester details",
     matchAlert: "You were matched with this request",
     respondNow: "Respond now so the requester is not left waiting",
+    whatsapp: "Connect on WhatsApp",
+    whatsappSending: "Opening WhatsApp…",
+    whatsappError: "Could not start WhatsApp. Try again.",
   },
   donor: {
     badge: "Become a Donor",
@@ -787,6 +790,9 @@ const hi: Messages = {
     closeRequester: "अनुरोधकर्ता विवरण बंद करें",
     matchAlert: "आप इस अनुरोध से मैच हुए हैं",
     respondNow: "अनुरोधकर्ता को इंतज़ार न कराना पड़े, अभी जवाब दें",
+    whatsapp: "WhatsApp पर जुड़ें",
+    whatsappSending: "WhatsApp खुल रहा है…",
+    whatsappError: "WhatsApp शुरू नहीं हो सका। फिर कोशिश करें।",
   },
   donor: {
     badge: "डोनर बनें",

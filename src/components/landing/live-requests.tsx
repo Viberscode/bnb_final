@@ -18,6 +18,7 @@ import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
 import {
@@ -440,13 +441,16 @@ function RequestDetailModal({
         </dl>
 
         {revealContact && request.phone ? (
-          <a
-            href={`tel:${request.phone}`}
-            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c91833] to-[#8a1024] text-sm font-black uppercase tracking-[0.08em] text-white shadow-[0_14px_28px_-12px_rgba(196,18,47,0.7)]"
-          >
-            <Phone className="size-4" aria-hidden />
-            {t("live.callRequester")}
-          </a>
+          <>
+            <a
+              href={`tel:${request.phone}`}
+              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c91833] to-[#8a1024] text-sm font-black uppercase tracking-[0.08em] text-white shadow-[0_14px_28px_-12px_rgba(196,18,47,0.7)]"
+            >
+              <Phone className="size-4" aria-hidden />
+              {t("live.callRequester")}
+            </a>
+            <WhatsAppConnectButton requestId={request.id} className="mt-2" />
+          </>
         ) : null}
       </div>
     </div>

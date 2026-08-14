@@ -7,6 +7,7 @@ import { neededBloodGroups, totalUnits } from "@/lib/blood-compatibility";
 import { formatCountdown, remainingMs } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
+import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import type { BloodRequest } from "@/types";
 
 export function AssignedRequesterDetails({
@@ -158,13 +159,16 @@ export function AssignedRequesterDetails({
         ) : null}
 
         {request.phone ? (
-          <a
-            href={`tel:${request.phone}`}
-            className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c91833] to-[#8a1024] text-sm font-black uppercase tracking-[0.08em] text-white"
-          >
-            <Phone className="size-4" aria-hidden />
-            {request.phone}
-          </a>
+          <>
+            <a
+              href={`tel:${request.phone}`}
+              className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c91833] to-[#8a1024] text-sm font-black uppercase tracking-[0.08em] text-white"
+            >
+              <Phone className="size-4" aria-hidden />
+              {request.phone}
+            </a>
+            <WhatsAppConnectButton requestId={request.id} className="mt-2" />
+          </>
         ) : null}
 
         <p className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted">

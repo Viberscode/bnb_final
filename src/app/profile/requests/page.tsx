@@ -201,6 +201,7 @@ export default function MyRequestsPage() {
               canViewAssignedDonor(selected, selected.assignment, user?.id) ? (
               <AssignedDonorDetails
                 assignment={selected.assignment}
+                requestId={selected.id}
                 onClose={() => setDonorRequestId(null)}
               />
             ) : null;

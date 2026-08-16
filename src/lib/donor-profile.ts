@@ -125,13 +125,22 @@ export async function saveDonorProfile(
 
   const { data: existingRow } = await supabase
     .from("donor_profiles")
-    .select("joined_at")
+    .select(
+      "joined_at, donations_completed, trust_score, lives_helped, avg_response_minutes",
+    )
     .eq("id", user.id)
     .maybeSingle();
-  const joinedAt = createdAfterReset(
-    (existingRow as { joined_at?: string } | null)?.joined_at,
-  )
-    ? (existingRow as { joined_at: string }).joined_at
+  const existing = existingRow as
+    | {
+        joined_at?: string;
+        donations_completed?: number;
+        trust_score?: number;
+        lives_helped?: number;
+        avg_response_minutes?: number;
+      }
+    | null;
+  const joinedAt = createdAfterReset(existing?.joined_at)
+    ? existing!.joined_at!
     : new Date().toISOString();
 
   const payload = {
@@ -146,10 +155,11 @@ export async function saveDonorProfile(
     last_donation: input.lastDonation || null,
     age: input.age ?? null,
     notes: input.notes?.trim() || null,
-    donations_completed: input.donationsCompleted ?? 0,
-    trust_score: input.trustScore ?? 72,
-    lives_helped: input.livesHelped ?? 0,
-    avg_response_minutes: input.avgResponseMinutes ?? 14,
+    donations_completed: input.donationsCompleted ?? existing?.donations_completed ?? 0,
+    trust_score: input.trustScore ?? existing?.trust_score ?? 72,
+    lives_helped: input.livesHelped ?? existing?.lives_helped ?? 0,
+    avg_response_minutes:
+      input.avgResponseMinutes ?? existing?.avg_response_minutes ?? 14,
     joined_at: joinedAt,
     updated_at: new Date().toISOString(),
   };

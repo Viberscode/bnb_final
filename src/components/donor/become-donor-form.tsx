@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Droplets,
   Loader2,
   MapPin,
+  Navigation,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -15,7 +15,10 @@ import {
 import { MockKycPanel } from "@/components/donor/mock-kyc-panel";
 import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
+import { DEMO_HOSPITALS } from "@/data/demo";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
+import { distanceKm, NEARBY_HOSPITAL_RADIUS_KM } from "@/lib/geo";
+import { useLiveLocation } from "@/hooks/use-live-location";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
@@ -111,7 +114,6 @@ function StepPanel({
 }
 
 export function BecomeDonorForm() {
-  const router = useRouter();
   const { t, locale } = useLanguage();
   const { user, status } = useAuth();
   const [fullName, setFullName] = useState("");
@@ -129,6 +131,8 @@ export function BecomeDonorForm() {
   const [error, setError] = useState<string | null>(null);
   const [isEdit, setIsEdit] = useState(false);
   const [kycVerified, setKycVerified] = useState(false);
+  const [manualLocation, setManualLocation] = useState(false);
+  const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
 
   useEffect(() => {
     if (user) {
@@ -157,11 +161,25 @@ export function BecomeDonorForm() {
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
       setNotes(existing.notes ?? "");
+      setManualLocation(true);
     })();
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!coords || manualLocation) return;
+    const nearest = [...DEMO_HOSPITALS]
+      .map((place) => ({
+        ...place,
+        distanceKm: distanceKm(coords.lat, coords.lng, place.lat, place.lng),
+      }))
+      .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+    if (!nearest) return;
+    setCity(nearest.city);
+    setArea(nearest.area);
+  }, [coords, manualLocation]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -195,6 +213,10 @@ export function BecomeDonorForm() {
       setError(t("donor.errPhoneDigits"));
       return;
     }
+    if (!coords) {
+      setError(t("donor.errLocation"));
+      return;
+    }
     if (!city.trim() || !area.trim()) {
       setError(t("donor.errCity"));
       return;
@@ -218,7 +240,7 @@ export function BecomeDonorForm() {
         age: age ? Number(age) : undefined,
         notes,
       });
-      router.push("/profile/donor");
+      window.location.assign("/profile/donor");
     } catch (err) {
       setError(
         err instanceof Error
@@ -416,6 +438,45 @@ export function BecomeDonorForm() {
         icon={MapPin}
         delayMs={340}
       >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-ink-muted">
+            <Navigation className="size-4 text-teal" aria-hidden />
+            {locStatus === "loading" && (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="size-3.5 animate-spin" /> {t("donor.gettingLocation")}
+              </span>
+            )}
+            {locStatus === "tracking" && coords && (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-xs font-bold text-teal-deep">
+                  <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  {t("request.live")}
+                </span>
+                {t("request.withinKm", {
+                  km: NEARBY_HOSPITAL_RADIUS_KM,
+                  m: Math.round(coords.accuracy),
+                })}
+              </span>
+            )}
+            {locStatus === "denied" && <span>{t("request.locationBlocked")}</span>}
+            {locStatus === "unavailable" && (
+              <span>{t("request.locationUnavailable")}</span>
+            )}
+          </div>
+          {(locStatus === "denied" || locStatus === "unavailable") && (
+            <button
+              type="button"
+              onClick={retryLocation}
+              className="rounded-lg bg-teal-soft px-2.5 py-1 text-xs font-bold text-teal-deep hover:bg-teal/20"
+            >
+              {t("request.tryAgain")}
+            </button>
+          )}
+        </div>
+        {locStatus === "tracking" && coords ? (
+          <p className="mb-3 text-xs font-semibold text-teal-deep">{t("donor.liveArea")}</p>
+        ) : null}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-bold text-ink">
@@ -423,7 +484,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={city}
-              onChange={(e) => setCity(e.target.value)}
+              onChange={(e) => {
+                setManualLocation(true);
+                setCity(e.target.value);
+              }}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="New Delhi"
               required
@@ -435,7 +499,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={area}
-              onChange={(e) => setArea(e.target.value)}
+              onChange={(e) => {
+                setManualLocation(true);
+                setArea(e.target.value);
+              }}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="Saket / Dwarka / …"
               required

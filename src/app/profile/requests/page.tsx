@@ -11,7 +11,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import { canViewAssignedDonor, withAssignments } from "@/lib/donor-assignment";
+import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
@@ -29,6 +29,7 @@ export default function MyRequestsPage() {
   const [watchId, setWatchId] = useState<string | null>(null);
   const [donorRequestId, setDonorRequestId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [waitingId, setWaitingId] = useState<string | null>(null);
   const ownedRequests = useMemo(
     () =>
       myRequests.map((request) =>
@@ -171,12 +172,21 @@ export default function MyRequestsPage() {
                             : undefined
                         }
                         confirming={completingId === request.id}
+                        waiting={waitingId === request.id}
                         onConfirmSolved={() => {
                           setCompletingId(request.id);
                           void completeLiveRequest(request.id)
                             .then(() => fetchMyLiveRequests(user.id))
                             .then((next) => setMyRequests(next))
                             .finally(() => setCompletingId(null));
+                        }}
+                        onWaitMore={() => {
+                          setWaitingId(request.id);
+                          void waitForAnotherDonor(request.id)
+                            .then(() => startAssignmentForRequest(request, otherDonors))
+                            .then(() => fetchMyLiveRequests(user.id))
+                            .then((next) => setMyRequests(next))
+                            .finally(() => setWaitingId(null));
                         }}
                       />
                     ))

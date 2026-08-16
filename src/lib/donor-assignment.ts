@@ -590,6 +590,28 @@ export async function respondToAssignment(
   notifyLive();
 }
 
+export async function waitForAnotherDonor(requestId: string) {
+  await fetchRemoteStore(true);
+  const store = readMergedStore();
+  const current = store[requestId];
+  if (
+    !current?.donorId ||
+    (current.status !== "accepted" && current.status !== "pending")
+  ) {
+    return;
+  }
+
+  store[requestId] = {
+    ...current,
+    status: "declined",
+    declinedDonorIds: [...new Set([...current.declinedDonorIds, current.donorId])],
+  };
+  writeStore(store);
+  await persistAssignment(requestId, store[requestId]);
+  await persistRequestStatus(requestId, "matching");
+  notifyLive();
+}
+
 const assignmentListeners = new Set<() => void>();
 let assignmentChannel: ReturnType<
   NonNullable<ReturnType<typeof tryCreateClient>>["channel"]

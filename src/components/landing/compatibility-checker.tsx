@@ -7,6 +7,7 @@ import {
   BLOOD_GROUPS,
   compatibilitySummary,
 } from "@/lib/blood-compatibility";
+import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/i18n/language-provider";
 
@@ -58,7 +59,7 @@ function AnimatedDroplet({ group, bumpKey }: { group: BloodGroup; bumpKey: numbe
             <ellipse cx="44" cy="70" rx="10" ry="16" fill="white" opacity="0.22" />
           </svg>
           <span className="absolute inset-0 flex items-center justify-center pt-6 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            {group}
+            <BloodGroupText group={group} />
           </span>
         </div>
       </div>
@@ -85,7 +86,7 @@ function MatchChip({
       )}
       style={{ animationDelay: `${delayMs}ms` }}
     >
-      {group}
+      <BloodGroupText group={group} />
     </span>
   );
 }
@@ -180,7 +181,7 @@ export function CompatibilityChecker() {
                           : "border-line bg-paper text-ink hover:-translate-y-0.5 hover:border-crimson/45 hover:bg-crimson-soft/60 active:scale-95",
                       )}
                     >
-                      {group}
+                      <BloodGroupText group={group} />
                     </button>
                   );
                 })}

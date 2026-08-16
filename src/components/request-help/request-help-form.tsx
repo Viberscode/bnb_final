@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
-  Check,
   Clock3,
   Droplets,
   Hospital as HospitalIcon,
@@ -23,7 +22,8 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
-import { BloodGroupMark } from "@/components/request-help/blood-group-mark";
+import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
+import { BloodGroupMark, BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
 import { DEMO_HOSPITALS, URGENCY_OPTIONS } from "@/data/demo";
 import { useLiveLocation } from "@/hooks/use-live-location";
@@ -34,7 +34,7 @@ import {
   NEARBY_HOSPITAL_RADIUS_KM,
 } from "@/lib/geo";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import { canViewAssignedDonor, canShareContactDetails, startAssignmentForRequest, withAssignments } from "@/lib/donor-assignment";
+import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   addLiveRequest,
@@ -151,6 +151,7 @@ export function RequestHelpForm() {
   const [checkingActive, setCheckingActive] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [waitingMore, setWaitingMore] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [donorOpen, setDonorOpen] = useState(false);
   const ownedRequest = useMemo(() => {
@@ -439,6 +440,44 @@ export function RequestHelpForm() {
                     showAssignedDonor ? () => setDonorOpen(true) : undefined
                   }
                 />
+                <RequesterConfirmPanel
+                  request={liveActive}
+                  confirming={completing}
+                  waiting={waitingMore}
+                  onAccepted={async () => {
+                    setError(null);
+                    setCompleting(true);
+                    try {
+                      await completeLiveRequest(liveActive.id);
+                      setActiveRequest(null);
+                    } catch (err) {
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : t("request.errComplete"),
+                      );
+                    } finally {
+                      setCompleting(false);
+                    }
+                  }}
+                  onWaitMore={async () => {
+                    setError(null);
+                    setWaitingMore(true);
+                    try {
+                      await waitForAnotherDonor(liveActive.id);
+                      await startAssignmentForRequest(liveActive, otherDonors);
+                      setSearchOpen(true);
+                    } catch (err) {
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : t("request.errWaitMore"),
+                      );
+                    } finally {
+                      setWaitingMore(false);
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
@@ -495,41 +534,6 @@ export function RequestHelpForm() {
             >
               {t("request.openLiveFeed")}
             </Link>
-            {canShareContactDetails(liveActive.assignment) ? (
-              <button
-                type="button"
-                disabled={completing}
-                onClick={async () => {
-                  setError(null);
-                  setCompleting(true);
-                  try {
-                    await completeLiveRequest(liveActive.id);
-                    setActiveRequest(null);
-                  } catch (err) {
-                    setError(
-                      err instanceof Error
-                        ? err.message
-                        : t("request.errComplete"),
-                    );
-                  } finally {
-                    setCompleting(false);
-                  }
-                }}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black uppercase tracking-[0.06em] text-white shadow-[0_14px_28px_-12px_rgba(5,150,105,0.7)] hover:bg-emerald-700 disabled:opacity-70"
-              >
-                {completing ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    {t("request.confirming")}
-                  </>
-                ) : (
-                  <>
-                    <Check className="size-4" aria-hidden />
-                    {t("request.confirmSolved")}
-                  </>
-                )}
-              </button>
-            ) : null}
           </div>
           {error ? (
             <p
@@ -736,7 +740,7 @@ export function RequestHelpForm() {
                           : "border-rose-100 bg-white/90 text-ink shadow-sm hover:-translate-y-0.5 hover:border-crimson/35 hover:shadow-md",
                     )}
                   >
-                    {group}
+                    <BloodGroupText group={group} />
                   </button>
                 );
               })}
@@ -760,7 +764,7 @@ export function RequestHelpForm() {
                       className="flex items-center gap-3 rounded-2xl border border-rose-100 bg-white/95 px-3 py-2.5"
                     >
                       <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] font-display text-sm font-extrabold text-white">
-                        {group}
+                        <BloodGroupText group={group} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-ink">

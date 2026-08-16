@@ -15,6 +15,47 @@ const URGENCY_BG: Record<UrgencyLevel, string> = {
   planned: "bg-gradient-to-br from-teal to-teal-deep",
 };
 
+/** ABO with Rh raised like clinical notation (A⁺, O⁻). */
+export function BloodGroupText({
+  group,
+  className,
+}: {
+  group: string;
+  className?: string;
+}) {
+  const rh = group.endsWith("+") || group.endsWith("-") ? group.slice(-1) : "";
+  const abo = rh ? group.slice(0, -1) : group;
+  return (
+    <span className={cn("inline-flex items-start font-[inherit]", className)}>
+      <span className="leading-none">{abo}</span>
+      {rh ? (
+        <sup className="relative top-[-0.32em] ml-[0.04em] text-[0.55em] font-extrabold leading-none">
+          {rh}
+        </sup>
+      ) : null}
+    </span>
+  );
+}
+
+export function BloodGroupList({
+  groups,
+  className,
+}: {
+  groups: string[];
+  className?: string;
+}) {
+  return (
+    <span className={cn("inline-flex flex-wrap items-center gap-x-1", className)}>
+      {groups.map((group, index) => (
+        <span key={`${group}-${index}`} className="inline-flex items-center gap-1">
+          <BloodGroupText group={group} />
+          {index < groups.length - 1 ? <span aria-hidden>·</span> : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function BloodGroupMark({
   request,
   groups,
@@ -43,11 +84,11 @@ export function BloodGroupMark({
             "inline-flex shrink-0 items-center justify-center font-display font-extrabold leading-none text-white",
             URGENCY_BG[tone],
             size === "lg"
-              ? "size-12 rounded-2xl text-lg"
-              : "size-10 rounded-xl text-sm",
+              ? "size-11 rounded-xl text-base sm:size-12 sm:rounded-2xl sm:text-lg"
+              : "size-9 rounded-xl text-sm",
           )}
         >
-          {group}
+          <BloodGroupText group={group} />
         </span>
       ))}
     </div>
@@ -77,10 +118,13 @@ export function UnitsNeededLine({
   return (
     <span className="flex flex-col gap-0.5 font-display text-lg font-extrabold leading-tight tracking-tight tabular-nums">
       {breakdown.map((item, index) => (
-        <span key={item.group}>
-          {item.group} {item.units}{" "}
-          {item.units > 1 ? t("live.units") : t("live.unit")}
-          {index === breakdown.length - 1 ? ` ${t("live.needed")}` : ""}
+        <span key={item.group} className="inline-flex items-baseline gap-1">
+          <BloodGroupText group={item.group} />
+          <span>
+            {item.units}{" "}
+            {item.units > 1 ? t("live.units") : t("live.unit")}
+            {index === breakdown.length - 1 ? ` ${t("live.needed")}` : ""}
+          </span>
         </span>
       ))}
     </span>

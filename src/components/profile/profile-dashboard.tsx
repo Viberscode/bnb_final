@@ -12,7 +12,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { BloodGroupText } from "@/components/request-help/blood-group-mark";
+import { MedalCollection } from "@/components/achievements/medal-collection";
 import { cn } from "@/lib/utils";
+import type { DonorActivity } from "@/lib/donor-activity";
 import type { DonorProfile } from "@/types";
 
 function StatCard({
@@ -53,9 +56,11 @@ function StatCard({
 
 export function ProfileDashboard({
   profile,
+  activity,
   onToggle,
 }: {
   profile: DonorProfile;
+  activity: DonorActivity;
   onToggle: (next: boolean) => void;
 }) {
   const { t, locale } = useLanguage();
@@ -77,7 +82,7 @@ export function ProfileDashboard({
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3.5">
             <span className="inline-flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] font-display text-xl font-extrabold text-white shadow-[0_14px_28px_-12px_rgba(196,18,47,0.7)] sm:size-16 sm:text-2xl">
-              {profile.bloodGroup}
+              <BloodGroupText group={profile.bloodGroup} />
             </span>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-deep">
@@ -183,7 +188,7 @@ export function ProfileDashboard({
                   {key === "phone" ? (
                     <Phone className="size-3.5 text-ink-muted" aria-hidden />
                   ) : null}
-                  {value}
+                  {key === "group" ? <BloodGroupText group={value} /> : value}
                 </dd>
               </div>
             ))}
@@ -204,6 +209,8 @@ export function ProfileDashboard({
             </Link>
           </div>
       </section>
+
+      <MedalCollection activity={activity} />
     </div>
   );
 }

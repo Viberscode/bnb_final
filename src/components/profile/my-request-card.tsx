@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Check, Loader2, MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin } from "lucide-react";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { BloodGroupMark, UnitsNeededLine } from "@/components/request-help/blood-group-mark";
+import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { canShareContactDetails } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
 import { cn } from "@/lib/utils";
 import type { BloodRequest } from "@/types";
@@ -16,13 +16,17 @@ export function MyRequestCard({
   onWatchSearch,
   onViewDonor,
   onConfirmSolved,
+  onWaitMore,
   confirming,
+  waiting,
 }: {
   request: BloodRequest;
   onWatchSearch?: () => void;
   onViewDonor?: () => void;
   onConfirmSolved?: () => void;
+  onWaitMore?: () => void;
   confirming?: boolean;
+  waiting?: boolean;
 }) {
   const { t, locale } = useLanguage();
   const created = new Date(request.createdAt).toLocaleString(
@@ -99,23 +103,13 @@ export function MyRequestCard({
               <VoiceNotePlayer src={request.voiceNoteUrl} compact />
             </div>
           ) : null}
-          {onConfirmSolved &&
-          canShareContactDetails(request.assignment) &&
-          request.status !== "completed" ? (
-            <button
-              type="button"
-              disabled={confirming}
-              onClick={onConfirmSolved}
-              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-emerald-700 disabled:opacity-70"
-            >
-              {confirming ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Check className="size-4" aria-hidden />
-              )}
-              {confirming ? t("request.confirming") : t("request.confirmSolved")}
-            </button>
-          ) : null}
+          <RequesterConfirmPanel
+            request={request}
+            confirming={confirming}
+            waiting={waiting}
+            onAccepted={onConfirmSolved}
+            onWaitMore={onWaitMore}
+          />
         </div>
         <Link
           href={`/requests?highlight=${request.id}`}

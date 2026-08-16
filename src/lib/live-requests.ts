@@ -390,6 +390,18 @@ export async function completeLiveRequest(requestId: string): Promise<void> {
     throw new Error(error.message || "Could not confirm this request.");
   }
 
+  const { data: assignment } = await supabase
+    .from("request_assignments")
+    .select("donor_id")
+    .eq("request_id", requestId)
+    .eq("status", "accepted")
+    .maybeSingle();
+  const donorId = (assignment as { donor_id?: string } | null)?.donor_id;
+  if (donorId) {
+    const { recordVerifiedDonation } = await import("@/lib/donor-activity");
+    await recordVerifiedDonation(donorId);
+  }
+
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(LIVE_REQUESTS_EVENT));
   }

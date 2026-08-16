@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
 import { canShareContactDetails } from "@/lib/donor-assignment";
 import { fetchDonorProfile } from "@/lib/donor-profile";
+import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { ContactPhone } from "@/components/request-help/contact-phone";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { cn } from "@/lib/utils";
@@ -94,7 +95,7 @@ export function AssignedDonorDetails({
           {profile?.fullName || assignment.donorName}
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">
-          {profile?.bloodGroup || assignment.bloodGroup} ·{" "}
+          <BloodGroupText group={profile?.bloodGroup || assignment.bloodGroup} /> ·{" "}
           {formatDistance(assignment.distanceKm)}
         </p>
 

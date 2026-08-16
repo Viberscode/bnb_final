@@ -263,7 +263,7 @@ export function LandingHero() {
             </svg>
           </div>
 
-          <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-3.5 sm:mt-10 sm:max-w-none sm:grid-cols-3 lg:max-w-md lg:grid-cols-1">
+          <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-5 sm:mt-10 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
             {ACTIONS.filter((action) => !(action.role === "ngo" && ngoName)).map((action) => (
               <button
                 key={action.role}

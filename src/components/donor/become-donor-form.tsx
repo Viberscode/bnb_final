@@ -13,6 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { MockKycPanel } from "@/components/donor/mock-kyc-panel";
+import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -341,7 +342,7 @@ export function BecomeDonorForm() {
                   : "border-rose-100 bg-white/90 text-ink shadow-sm hover:border-crimson/35 hover:shadow-md",
               )}
             >
-              {group}
+              <BloodGroupText group={group} />
             </button>
           ))}
         </div>

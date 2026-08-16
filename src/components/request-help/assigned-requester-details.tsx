@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Check, MapPin, Phone, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { BloodGroupList } from "@/components/request-help/blood-group-mark";
 import { neededBloodGroups, totalUnits } from "@/lib/blood-compatibility";
 import { formatCountdown, remainingMs, canShareContactDetails } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
@@ -27,7 +28,7 @@ export function AssignedRequesterDetails({
   const wait = remainingMs(assignment);
   const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
   const contactsOpen = canShareContactDetails(assignment);
-  const groups = neededBloodGroups(request).join(" · ");
+  const groups = neededBloodGroups(request);
   const units = totalUnits(request);
   const urgencyLabel =
     request.urgency === "critical"
@@ -76,7 +77,7 @@ export function AssignedRequesterDetails({
           {contactsOpen ? request.contactName : t("live.needDetails")}
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">
-          {groups} · {request.hospitalName}
+          <BloodGroupList groups={groups} /> · {request.hospitalName}
           {typeof request.distanceKm === "number"
             ? ` · ${formatDistance(request.distanceKm)}`
             : ""}
@@ -103,10 +104,17 @@ export function AssignedRequesterDetails({
               />
             </dd>
           </div>
+          <div className="rounded-xl border border-line bg-paper/70 px-3.5 py-2.5">
+            <dt className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
+              {t("live.bloodGroup")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-ink">
+              <BloodGroupList groups={groups} />
+            </dd>
+          </div>
           {[
             [t("live.hospital"), request.hospitalName],
             [t("match.location"), request.hospitalArea],
-            [t("live.bloodGroup"), groups],
             [
               t("live.unitsNeeded"),
               `${units} ${units > 1 ? t("live.units") : t("live.unit")}`,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
+  CheckCheck,
   Clock3,
   FileText,
   MapPin,
@@ -19,20 +20,24 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { ContactPhone } from "@/components/request-help/contact-phone";
+import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
+import { formatDistance } from "@/lib/geo";
 import {
-  canRevealContacts,
   canShareContactDetails,
   isAssignedDonor,
   isOwnDonor,
   rankRequestsForDonor,
   respondToAssignment,
+  waitForAnotherDonor,
+  startAssignmentForRequest,
   withAssignments,
 } from "@/lib/donor-assignment";
 import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
+  completeLiveRequest,
   fetchLiveRequests,
   subscribeLiveRequests,
   urgencyRank,
@@ -72,13 +77,13 @@ function UrgencyBadge({ urgency }: { urgency: UrgencyLevel }) {
   return (
     <span
       className={cn(
-        "live-urgency-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.7rem] font-black uppercase tracking-[0.12em] ring-1",
+        "live-urgency-badge inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-[0.1em] text-white ring-1",
         urgency === "critical" &&
-          "bg-[#c4122f] text-white ring-[#ff6b81] shadow-[0_8px_20px_-8px_rgba(196,18,47,0.9)]",
+          "bg-[#c4122f] ring-[#ff8a9a] shadow-[0_6px_16px_-8px_rgba(196,18,47,0.9)]",
         urgency === "urgent" &&
-          "bg-amber-500 text-white ring-amber-300 shadow-[0_8px_20px_-8px_rgba(217,119,6,0.85)]",
+          "bg-amber-500 ring-amber-200 shadow-[0_6px_16px_-8px_rgba(217,119,6,0.85)]",
         urgency === "planned" &&
-          "bg-teal text-white ring-teal/40 shadow-[0_8px_20px_-8px_rgba(13,115,112,0.7)]",
+          "bg-teal ring-teal/35 shadow-[0_6px_16px_-8px_rgba(13,115,112,0.7)]",
       )}
     >
       {urgency === "critical" ? (
@@ -88,7 +93,10 @@ function UrgencyBadge({ urgency }: { urgency: UrgencyLevel }) {
       ) : (
         <Radio className="size-3.5" aria-hidden />
       )}
-      {label} · {window}
+      {label}
+      <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[0.58rem] font-black tracking-wide">
+        {window}
+      </span>
     </span>
   );
 }
@@ -98,41 +106,54 @@ function RequestCard({
   highlighted,
   isMine,
   canOpen,
-  revealContact,
+  confirming,
+  waiting,
   onOpen,
+  onAccepted,
+  onWaitMore,
 }: {
   request: BloodRequest;
   highlighted?: boolean;
   isMine?: boolean;
   canOpen?: boolean;
-  revealContact?: boolean;
+  confirming?: boolean;
+  waiting?: boolean;
   onOpen?: () => void;
+  onAccepted?: () => void;
+  onWaitMore?: () => void;
 }) {
   const { t } = useLanguage();
   const done = request.status === "completed";
+  const patients = request.patientsCount ?? 1;
+  const donorAccepted =
+    !done &&
+    (request.assignment?.status === "accepted" ||
+      request.status === "donor_accepted");
+
   return (
     <article
       id={`request-${request.id}`}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-white p-5 text-left transition duration-300",
-        done &&
-          "border-emerald-300 bg-emerald-50/70 opacity-70 grayscale-[0.35]",
+        "group relative overflow-hidden rounded-[1.35rem] border bg-white p-3.5 text-left shadow-[0_16px_36px_-26px_rgba(28,13,20,0.42)] transition duration-300",
+        done && "border-emerald-200 bg-emerald-50/80 opacity-80 grayscale-[0.2]",
         !done &&
           highlighted &&
-          "border-crimson shadow-[0_0_0_2px_rgba(196,18,47,0.25)] ring-2 ring-crimson/20",
+          "border-crimson/70 shadow-[0_16px_36px_-22px_rgba(196,18,47,0.45)] ring-2 ring-crimson/15",
         !done &&
           !highlighted &&
           request.urgency === "critical" &&
-          "live-request-card--critical border-[#ff2d4a] bg-[#fff7f8]",
+          "live-request-card--critical border-[#ffb3bf] bg-gradient-to-br from-white via-[#fff8f9] to-white",
         !done &&
           !highlighted &&
           request.urgency === "urgent" &&
-          "live-request-card--urgent border-amber-400 bg-[#fffbeb]",
+          "live-request-card--urgent border-amber-200 bg-gradient-to-br from-white via-[#fffaf3] to-white",
         !done &&
           !highlighted &&
           request.urgency === "planned" &&
-          "live-request-card--planned border-teal/40 bg-[#f4fbfa]",
-        canOpen && !done && "cursor-pointer hover:-translate-y-0.5",
+          "live-request-card--planned border-teal/25 bg-gradient-to-br from-white via-[#f7fcfb] to-white",
+        canOpen &&
+          !done &&
+          "cursor-pointer hover:-translate-y-1 hover:shadow-[0_20px_40px_-22px_rgba(28,13,20,0.5)]",
       )}
       role={canOpen && !done ? "button" : undefined}
       tabIndex={canOpen && !done ? 0 : undefined}
@@ -148,117 +169,128 @@ function RequestCard({
           : undefined
       }
     >
-      {done ? (
-        <span className="absolute inset-x-0 top-0 z-10 flex items-center justify-center bg-emerald-600 py-1.5 text-[0.7rem] font-black uppercase tracking-[0.18em] text-white">
-          {t("live.done")}
-        </span>
-      ) : isMine ? (
-        <span className="absolute right-2.5 top-2.5 z-10 rounded-md bg-ink/90 px-1.5 py-0.5 text-[0.55rem] font-black uppercase tracking-[0.12em] text-white">
-          {t("live.yours")}
-        </span>
-      ) : null}
       <span
         className={cn(
-          "live-siren-bar pointer-events-none absolute inset-x-0 top-0 h-1.5",
+          "pointer-events-none absolute inset-y-0 left-0 w-1.5",
           done && "bg-emerald-500",
-          !done &&
-            request.urgency === "critical" &&
-            "bg-gradient-to-r from-[#ff2d4a] via-[#c4122f] to-[#ff2d4a]",
-          !done &&
-            request.urgency === "urgent" &&
-            "bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400",
-          !done &&
-            request.urgency === "planned" &&
-            "bg-gradient-to-r from-teal via-emerald-500 to-teal",
+          !done && request.urgency === "critical" && "bg-[#c4122f]",
+          !done && request.urgency === "urgent" && "bg-amber-500",
+          !done && request.urgency === "planned" && "bg-teal",
         )}
         aria-hidden
       />
 
-      <div className={cn("flex flex-wrap items-start justify-between gap-3", done && "pt-7")}>
-        <div className="flex items-start gap-3">
-          <BloodGroupMark request={request} />
-          <div>
-            <p className="font-display text-lg font-black tracking-tight text-ink">
-              <UnitsNeededLine request={request} />
-            </p>
-            <p className="mt-0.5 text-xs font-semibold text-ink-muted">
-              {(request.patientsCount ?? 1) > 1
-                ? `${request.patientsCount} ${t("live.people")} · `
-                : ""}
-              {timeAgo(request.createdAt, t)}
-            </p>
-          </div>
-        </div>
-        <div className={cn("flex items-start justify-end", isMine && "pt-4")}>
-          <UrgencyBadge urgency={request.urgency} />
-        </div>
-      </div>
-
-      <p className="mt-4 flex items-start gap-2 text-sm text-ink">
-        <MapPin
-          className={cn(
-            "mt-0.5 size-4 shrink-0",
-            request.urgency === "critical" && "text-crimson",
-            request.urgency === "urgent" && "text-amber-600",
-            request.urgency === "planned" && "text-teal",
-          )}
-          aria-hidden
-        />
-        <span>
-          <span className="font-semibold">{request.hospitalName}</span>
-          <span className="mt-0.5 block text-ink-muted">
-            {request.hospitalArea}
-            {typeof request.distanceKm === "number"
-              ? ` · ${request.distanceKm.toFixed(1)} km`
-              : ""}
+      {done ? (
+        <span className="mb-2 flex items-center justify-center rounded-xl bg-emerald-600 py-1 text-[0.65rem] font-black uppercase tracking-[0.18em] text-white">
+          {t("live.done")}
+        </span>
+      ) : (
+        <div className="mb-2.5 flex items-center justify-between gap-2 pl-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-wider text-white",
+              donorAccepted
+                ? "live-accepted-badge bg-sky-600"
+                : "live-matching-badge bg-emerald-500",
+            )}
+          >
+            <Radio className="size-3" aria-hidden />
+            {donorAccepted
+              ? `${t("live.liveStatus")} · ${t("live.donorAccepted")}`
+              : `${t("live.liveStatus")} · ${t("live.matching")}`}
           </span>
-          {request.voiceNoteUrl ? (
-            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-crimson-soft px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wider text-crimson">
-              <Mic className="size-3" aria-hidden />
-              {t("live.voiceNote")}
+          {isMine || donorAccepted ? (
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              {isMine ? (
+                <span className="rounded-full bg-ink px-2 py-0.5 text-[0.55rem] font-black uppercase tracking-[0.14em] text-white">
+                  {t("live.yours")}
+                </span>
+              ) : null}
+              {donorAccepted ? (
+                <span
+                  className="inline-flex size-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 ring-1 ring-emerald-200"
+                  title={t("live.donorAccepted")}
+                  aria-label={t("live.donorAccepted")}
+                >
+                  <CheckCheck className="size-4" strokeWidth={2.6} aria-hidden />
+                </span>
+              ) : null}
             </span>
           ) : null}
-        </span>
-      </p>
+        </div>
+      )}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3 text-sm">
-        <span className="text-ink-muted">
-          {t("live.contact")}:{" "}
-          <ContactPhone
-            phone={request.phone}
-            revealed={revealContact}
-            className="text-ink"
-          />
-        </span>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-wider",
-            done && "bg-emerald-100 text-emerald-800",
-            !done &&
-              request.urgency === "critical" &&
-              "bg-[#fff1f3] text-[#c4122f]",
-            !done && request.urgency === "urgent" && "bg-amber-100 text-amber-800",
-            !done && request.urgency === "planned" && "bg-teal-soft text-teal-deep",
-          )}
-        >
-          {done ? (
-            t("live.done")
-          ) : (
-            <>
-              <Radio className="size-3 animate-pulse" aria-hidden />
-              {t("live.liveStatus")} · {request.status.replace("_", " ")}
-            </>
-          )}
-        </span>
+      <div className="flex min-w-0 items-center gap-2.5 pl-2">
+        <BloodGroupMark request={request} />
+        <div className="min-w-0">
+          <p className="font-display text-lg font-extrabold leading-tight tracking-tight text-ink">
+            <UnitsNeededLine request={request} />
+          </p>
+          <p className="mt-0.5 text-xs font-semibold text-ink-muted">
+            {patients > 1 ? `${patients} ${t("live.people")} · ` : ""}
+            {timeAgo(request.createdAt, t)}
+          </p>
+        </div>
       </div>
-      <AssignedDonorLine
-        assignment={request.assignment}
-        viewer={isMine && !done ? "requester" : "public"}
-        requestId={isMine && !done ? request.id : undefined}
-      />
-      {canOpen ? (
-        <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">
-          {revealContact ? t("live.openDetails") : t("live.openNeed")}
+
+      <div className="mt-2.5 pl-2">
+        <UrgencyBadge urgency={request.urgency} />
+      </div>
+
+      <div className="ml-2 mt-2.5 rounded-xl border border-black/[0.04] bg-white/80 px-3 py-2.5">
+        <p className="text-[0.6rem] font-black uppercase tracking-[0.16em] text-ink-muted">
+          {t("live.hospital")}
+        </p>
+        <p className="mt-1 flex items-start gap-2 text-ink">
+          <MapPin
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              request.urgency === "critical" && "text-crimson",
+              request.urgency === "urgent" && "text-amber-600",
+              request.urgency === "planned" && "text-teal",
+            )}
+            aria-hidden
+          />
+          <span className="min-w-0">
+            <span className="block font-display text-[0.95rem] font-extrabold leading-snug tracking-tight">
+              {request.hospitalName}
+            </span>
+            <span className="mt-0.5 block text-xs font-semibold text-ink-muted">
+              {request.hospitalArea}
+            </span>
+            {typeof request.distanceKm === "number" ? (
+              <span className="mt-0.5 block text-xs font-bold text-ink">
+                {formatDistance(request.distanceKm)}
+              </span>
+            ) : null}
+          </span>
+        </p>
+        {request.voiceNoteUrl ? (
+          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-crimson-soft px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wider text-crimson">
+            <Mic className="size-3" aria-hidden />
+            {t("live.voiceNote")}
+          </span>
+        ) : null}
+      </div>
+      <div className="ml-2">
+        <AssignedDonorLine
+          assignment={request.assignment}
+          viewer={isMine && !done ? "requester" : "public"}
+          requestId={isMine && !done ? request.id : undefined}
+        />
+        {isMine && !done ? (
+          <RequesterConfirmPanel
+            request={request}
+            confirming={confirming}
+            waiting={waiting}
+            onAccepted={onAccepted}
+            onWaitMore={onWaitMore}
+          />
+        ) : null}
+      </div>
+      {canOpen && !done ? (
+        <p className="ml-2 mt-3 text-xs font-bold uppercase tracking-[0.12em] text-crimson">
+          {t("live.openNeed")}
         </p>
       ) : null}
     </article>
@@ -508,6 +540,8 @@ export function LiveRequests({
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openRequest, setOpenRequest] = useState<BloodRequest | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [waitingId, setWaitingId] = useState<string | null>(null);
   const pool =
     donor && !donors.some((item) => item.id === donor.id)
       ? [...donors, donor]
@@ -671,10 +705,32 @@ export function LiveRequests({
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
               canOpen={Boolean(donor && !isOwnDonor(request, donor))}
-              revealContact={Boolean(
-                user?.id && canRevealContacts(request, user.id),
-              )}
+              confirming={confirmingId === request.id}
+              waiting={waitingId === request.id}
               onOpen={() => setOpenRequest(request)}
+              onAccepted={
+                user?.id && request.userId === user.id
+                  ? () => {
+                      setConfirmingId(request.id);
+                      void completeLiveRequest(request.id)
+                        .then(() => fetchLiveRequests())
+                        .then(setRequests)
+                        .finally(() => setConfirmingId(null));
+                    }
+                  : undefined
+              }
+              onWaitMore={
+                user?.id && request.userId === user.id
+                  ? () => {
+                      setWaitingId(request.id);
+                      void waitForAnotherDonor(request.id)
+                        .then(() => startAssignmentForRequest(request, pool))
+                        .then(() => fetchLiveRequests())
+                        .then(setRequests)
+                        .finally(() => setWaitingId(null));
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>

@@ -8,6 +8,7 @@ import {
   remainingMs,
 } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
+import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { cn } from "@/lib/utils";
 import type { DonorAssignment } from "@/types";
@@ -40,11 +41,10 @@ export function AssignedDonorLine({
   );
 
   if (viewer === "requester") {
+    if (searching) return null;
     const label = accepted
       ? t("match.searchDone")
-      : pending
-        ? t("match.waiting", { time: formatCountdown(wait) })
-        : t("match.searching");
+      : t("match.waiting", { time: formatCountdown(wait) });
     return (
       <div className="mt-2">
         {(pending || accepted) && onViewDonor && assignment?.donorId ? (
@@ -97,7 +97,7 @@ export function AssignedDonorLine({
       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-ink">
         <HeartHandshake className="size-3.5 text-teal-deep" aria-hidden />
         <span>
-          {assignment.donorName} · {assignment.bloodGroup}
+          {assignment.donorName} · <BloodGroupText group={assignment.bloodGroup} />
         </span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted">
           <MapPin className="size-3" aria-hidden />

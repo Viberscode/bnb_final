@@ -12,12 +12,22 @@ import {
   subscribeDonorProfile,
   updateDonorAvailability,
 } from "@/lib/donor-profile";
+import { fetchDonorActivity } from "@/lib/donor-activity";
+import { subscribeLiveRequests } from "@/lib/live-requests";
+import type { DonorActivity } from "@/lib/donor-activity";
 import type { DonorProfile } from "@/types";
 
 export default function DonorProfilePage() {
   const { user, status } = useAuth();
   const { t } = useLanguage();
   const [profile, setProfile] = useState<DonorProfile | null>(null);
+  const [activity, setActivity] = useState<DonorActivity>({
+    verifiedDonations: 0,
+    criticalCompleted: 0,
+    emergencyCompleted: 0,
+    rapidCompleted: 0,
+    maxInOneCity: 0,
+  });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -25,8 +35,10 @@ export default function DonorProfilePage() {
 
     const refresh = async () => {
       const nextProfile = await fetchDonorProfile(user?.id);
+      const nextActivity = await fetchDonorActivity(user?.id, nextProfile);
       if (!active) return;
       setProfile(nextProfile);
+      setActivity(nextActivity);
       setReady(true);
     };
 
@@ -36,10 +48,14 @@ export default function DonorProfilePage() {
           void refresh();
         })
       : () => undefined;
+    const unsubLive = subscribeLiveRequests(() => {
+      void refresh();
+    });
 
     return () => {
       active = false;
       unsubProfile();
+      unsubLive();
     };
   }, [user?.id]);
 
@@ -103,6 +119,7 @@ export default function DonorProfilePage() {
               </Link>
               <ProfileDashboard
                 profile={profile}
+                activity={activity}
                 onToggle={(next) => {
                   void updateDonorAvailability(next).then((updated) => {
                     if (updated) setProfile(updated);

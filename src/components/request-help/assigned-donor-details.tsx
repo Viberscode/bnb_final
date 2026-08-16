@@ -7,7 +7,9 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
 import { canShareContactDetails } from "@/lib/donor-assignment";
 import { fetchDonorProfile } from "@/lib/donor-profile";
+import { ContactPhone } from "@/components/request-help/contact-phone";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
+import { cn } from "@/lib/utils";
 import type { DonorAssignment, DonorProfile } from "@/types";
 
 export function AssignedDonorDetails({
@@ -97,9 +99,20 @@ export function AssignedDonorDetails({
         </p>
 
         <dl className="mt-5 grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-xl border border-line bg-paper/70 px-3.5 py-2.5">
+            <dt className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
+              {t("profile.phone")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-ink">
+              <ContactPhone
+                phone={profile?.phone}
+                revealed={contactsOpen}
+                asLink={false}
+              />
+            </dd>
+          </div>
           {[
-            [t("profile.phone"), contactsOpen ? profile?.phone || "—" : t("live.contactHidden")],
-            [t("profile.email"), contactsOpen ? profile?.email || "—" : t("live.contactHidden")],
+            [t("profile.email"), profile?.email || "name@email.com"],
             [
               t("match.location"),
               profile ? `${profile.area}, ${profile.city}` : "—",
@@ -117,7 +130,15 @@ export function AssignedDonorDetails({
               <dt className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
                 {label}
               </dt>
-              <dd className="mt-1 text-sm font-semibold text-ink">{value}</dd>
+              <dd
+                className={cn(
+                  "mt-1 text-sm font-semibold text-ink",
+                  label === t("profile.email") && !contactsOpen && "select-none blur-[6px]",
+                )}
+                aria-hidden={label === t("profile.email") && !contactsOpen}
+              >
+                {value}
+              </dd>
             </div>
           ))}
         </dl>

@@ -6,6 +6,7 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { neededBloodGroups, totalUnits } from "@/lib/blood-compatibility";
 import { formatCountdown, remainingMs, canShareContactDetails } from "@/lib/donor-assignment";
 import { formatDistance } from "@/lib/geo";
+import { ContactPhone } from "@/components/request-help/contact-phone";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import type { BloodRequest } from "@/types";
@@ -90,8 +91,19 @@ export function AssignedRequesterDetails({
         ) : null}
 
         <dl className="mt-5 grid gap-2.5 sm:grid-cols-2">
+          <div className="rounded-xl border border-line bg-paper/70 px-3.5 py-2.5">
+            <dt className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-ink-muted">
+              {t("profile.phone")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-ink">
+              <ContactPhone
+                phone={request.phone}
+                revealed={contactsOpen}
+                asLink={false}
+              />
+            </dd>
+          </div>
           {[
-            [t("profile.phone"), contactsOpen ? request.phone || t("live.notShared") : t("live.contactHidden")],
             [t("live.hospital"), request.hospitalName],
             [t("match.location"), request.hospitalArea],
             [t("live.bloodGroup"), groups],

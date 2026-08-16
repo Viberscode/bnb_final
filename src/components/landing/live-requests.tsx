@@ -18,6 +18,7 @@ import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { ContactPhone } from "@/components/request-help/contact-phone";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
@@ -223,9 +224,11 @@ function RequestCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3 text-sm">
         <span className="text-ink-muted">
           {t("live.contact")}:{" "}
-          <span className="font-semibold text-ink">
-            {revealContact ? request.contactName : t("live.contactHidden")}
-          </span>
+          <ContactPhone
+            phone={request.phone}
+            revealed={revealContact}
+            className="text-ink"
+          />
         </span>
         <span
           className={cn(
@@ -399,16 +402,17 @@ function RequestDetailModal({
             </dt>
             <dd className="mt-1">
               {revealContact && request.phone ? (
-                <a
-                  href={`tel:${request.phone}`}
-                  className="font-display text-lg font-extrabold text-crimson underline-offset-2 hover:underline"
-                >
-                  {request.phone}
-                </a>
+                <ContactPhone
+                  phone={request.phone}
+                  revealed
+                  className="font-display text-lg font-extrabold text-crimson"
+                />
               ) : (
-                <span className="font-semibold text-ink-muted">
-                  {t("live.contactHidden")}
-                </span>
+                <ContactPhone
+                  phone={request.phone}
+                  revealed={false}
+                  className="font-display text-lg font-extrabold text-ink"
+                />
               )}
             </dd>
           </div>

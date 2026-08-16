@@ -214,7 +214,7 @@ let remoteUnavailableUntil = 0;
 let remoteFetchInFlight: Promise<AssignmentStore> | null = null;
 let lastRemoteFetchAt = 0;
 let remoteCache: AssignmentStore = {};
-const REMOTE_FETCH_MS = 2_000;
+const REMOTE_FETCH_MS = 800;
 const REMOTE_RETRY_MS = 20_000;
 
 function isMissingAssignmentsTable(error: {
@@ -479,6 +479,7 @@ export async function syncAssignments(
   let changed = false;
 
   const queue = [...requests].sort(compareRequestsByPriority);
+  const persists: Promise<void>[] = [];
   for (const request of queue) {
     const next = resolveRequestAssignment(request, donors, store, {
       allowCreate,
@@ -487,13 +488,14 @@ export async function syncAssignments(
       changed = true;
       if (next) {
         store[request.id] = next;
-        await persistAssignment(request.id, next);
+        persists.push(persistAssignment(request.id, next));
         if (next.status === "pending" && request.status === "pending") {
           void persistRequestStatus(request.id, "matching");
         }
       }
     }
   }
+  if (persists.length) await Promise.all(persists);
 
   if (changed) writeStore(store);
   else if (typeof window !== "undefined") {
@@ -607,7 +609,25 @@ function ensureAssignmentChannel() {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "request_assignments" },
-      () => {
+      (payload) => {
+        const eventType = payload.eventType;
+        const row = (
+          eventType === "DELETE" ? payload.old : payload.new
+        ) as Record<string, unknown> | null;
+        const requestId = String(row?.request_id ?? "");
+        if (requestId) {
+          if (eventType === "DELETE") {
+            const next = { ...remoteCache };
+            delete next[requestId];
+            remoteCache = next;
+          } else if (row) {
+            const assignment = toAssignment(row);
+            if (assignment) {
+              remoteCache = { ...remoteCache, [requestId]: assignment };
+            }
+          }
+        }
+        notifyAssignmentListeners();
         void fetchRemoteStore(true).then(() => notifyAssignmentListeners());
       },
     )

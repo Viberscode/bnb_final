@@ -25,22 +25,23 @@ export function useAssignmentEngine(
   };
 
   useEffect(() => {
-    const tick = () => {
-      setNow(Date.now());
-      void syncAssignments(latest.current.requests, latest.current.donors, {
+    const sync = () =>
+      syncAssignments(latest.current.requests, latest.current.donors, {
         allowCreate: latest.current.allowCreate,
       });
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
+
+    void sync();
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    const poll = window.setInterval(() => {
+      void sync();
+    }, 4000);
     const unsub = subscribeAssignments(() => {
-      void syncAssignments(latest.current.requests, latest.current.donors, {
-        allowCreate: latest.current.allowCreate,
-      });
+      void sync();
       setNow(Date.now());
     });
     return () => {
-      window.clearInterval(id);
+      window.clearInterval(clock);
+      window.clearInterval(poll);
       unsub();
     };
   }, []);

@@ -103,7 +103,7 @@ export function DonorMatchAlert() {
     });
     const id = window.setInterval(() => {
       void refresh();
-    }, 2500);
+    }, 8000);
 
     return () => {
       active = false;

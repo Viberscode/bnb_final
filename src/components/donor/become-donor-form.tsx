@@ -15,9 +15,8 @@ import {
 import { MockKycPanel } from "@/components/donor/mock-kyc-panel";
 import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
-import { DEMO_HOSPITALS } from "@/data/demo";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
-import { distanceKm, NEARBY_HOSPITAL_RADIUS_KM } from "@/lib/geo";
+import { reverseGeocode } from "@/lib/reverse-geocode";
 import { useLiveLocation } from "@/hooks/use-live-location";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
@@ -132,6 +131,7 @@ export function BecomeDonorForm() {
   const [isEdit, setIsEdit] = useState(false);
   const [kycVerified, setKycVerified] = useState(false);
   const [manualLocation, setManualLocation] = useState(false);
+  const [resolvingPlace, setResolvingPlace] = useState(false);
   const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
 
   useEffect(() => {
@@ -155,13 +155,10 @@ export function BecomeDonorForm() {
       setBloodGroup(existing.bloodGroup);
       setPhone(indianMobileDigits(existing.phone));
       setEmail(existing.email ?? "");
-      setCity(existing.city);
-      setArea(existing.area);
       setAvailable(existing.available);
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
       setNotes(existing.notes ?? "");
-      setManualLocation(true);
     })();
     return () => {
       active = false;
@@ -170,16 +167,22 @@ export function BecomeDonorForm() {
 
   useEffect(() => {
     if (!coords || manualLocation) return;
-    const nearest = [...DEMO_HOSPITALS]
-      .map((place) => ({
-        ...place,
-        distanceKm: distanceKm(coords.lat, coords.lng, place.lat, place.lng),
-      }))
-      .sort((a, b) => a.distanceKm - b.distanceKm)[0];
-    if (!nearest) return;
-    setCity(nearest.city);
-    setArea(nearest.area);
-  }, [coords, manualLocation]);
+    let active = true;
+    setResolvingPlace(true);
+    const timer = window.setTimeout(() => {
+      void reverseGeocode(coords.lat, coords.lng, locale).then((place) => {
+        if (!active) return;
+        setResolvingPlace(false);
+        if (!place) return;
+        setCity(place.city);
+        setArea(place.area);
+      });
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [coords, manualLocation, locale]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -452,10 +455,12 @@ export function BecomeDonorForm() {
                   <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
                   {t("request.live")}
                 </span>
-                {t("request.withinKm", {
-                  km: NEARBY_HOSPITAL_RADIUS_KM,
-                  m: Math.round(coords.accuracy),
-                })}
+                <span className="font-semibold text-ink">
+                  {t("donor.gpsAccuracy", { m: Math.round(coords.accuracy) })}
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-ink-muted">
+                  {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                </span>
               </span>
             )}
             {locStatus === "denied" && <span>{t("request.locationBlocked")}</span>}
@@ -474,7 +479,20 @@ export function BecomeDonorForm() {
           )}
         </div>
         {locStatus === "tracking" && coords ? (
-          <p className="mb-3 text-xs font-semibold text-teal-deep">{t("donor.liveArea")}</p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-teal-deep">
+              {resolvingPlace && !city ? t("donor.readingAddress") : t("donor.liveArea")}
+            </p>
+            {manualLocation ? (
+              <button
+                type="button"
+                onClick={() => setManualLocation(false)}
+                className="rounded-lg bg-teal-soft px-2.5 py-1 text-xs font-bold text-teal-deep hover:bg-teal/20"
+              >
+                {t("donor.followLive")}
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">

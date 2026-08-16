@@ -71,9 +71,15 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p>© {new Date().getFullYear()} BloodNearby.</p>
-          <p>{t("footer.demo")}</p>
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-5 py-5 sm:flex-row sm:justify-between sm:px-8">
+          <p className="text-xs text-white/40">© {new Date().getFullYear()} BloodNearby.</p>
+          <p className="inline-flex items-center gap-2 text-center font-display text-[0.8rem] italic tracking-wide text-white/70 sm:text-right">
+            <span
+              className="inline-block size-1.5 rounded-full bg-[#ff4d6d] shadow-[0_0_10px_rgba(255,77,109,0.9)]"
+              aria-hidden
+            />
+            {t("footer.tagline")}
+          </p>
         </div>
       </div>
     </footer>

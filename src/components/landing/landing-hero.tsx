@@ -190,6 +190,43 @@ const ACTIONS = [
   },
 ] as const;
 
+function VoiceLaunchButton({
+  onClick,
+  title,
+  subtitle,
+  className,
+}: {
+  onClick: () => void;
+  title: string;
+  subtitle: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#ffcc4d] via-[#ffe08a] to-[#ffb020] p-3.5 text-left text-[#1c0d14] shadow-[0_18px_44px_-10px_rgba(255,176,32,0.95)] ring-2 ring-white/90 transition hover:-translate-y-0.5 hover:brightness-105",
+        className,
+      )}
+    >
+      <span className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#1c0d14] text-[#ffd27a]">
+        <span className="absolute size-8 animate-ping rounded-full bg-[#ffd27a]/40" aria-hidden />
+        <Mic className="relative size-6" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-base font-extrabold tracking-tight sm:text-lg">
+          {title}
+        </span>
+        <span className="mt-0.5 block text-xs font-bold text-[#5c3b00]/80 sm:text-sm">
+          {subtitle}
+        </span>
+      </span>
+      <ArrowUpRight className="size-5 shrink-0 opacity-80 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+    </button>
+  );
+}
+
 export function LandingHero() {
   const router = useRouter();
   const { requireAuth } = useSignInPrompt();
@@ -240,6 +277,12 @@ export function LandingHero() {
     const qs = params.toString();
     router.replace(qs ? `/?${qs}` : "/", { scroll: false });
   }, [authStatus, requireAuth, router, t]);
+
+  function openVoice() {
+    if (requireAuth("/?voice=1", t("voiceAssist.authMessage"))) {
+      setVoiceOpen(true);
+    }
+  }
 
   return (
     <section
@@ -337,43 +380,36 @@ export function LandingHero() {
                   </span>
                 </span>
 
-                <ArrowUpRight
-                  className="relative size-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white"
-                  aria-hidden
-                />
+                {action.role === "patient" ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openVoice();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openVoice();
+                      }
+                    }}
+                    className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#ffcc4d] text-[#1c0d14] shadow-[0_10px_22px_-8px_rgba(255,204,77,0.9)] ring-2 ring-white/80 transition hover:scale-105"
+                    aria-label={t("hero.voiceTitle")}
+                    title={t("hero.voiceTitle")}
+                  >
+                    <span className="absolute size-7 animate-ping rounded-full bg-[#1c0d14]/20" aria-hidden />
+                    <Mic className="relative size-5" aria-hidden />
+                  </span>
+                ) : (
+                  <ArrowUpRight
+                    className="relative size-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white"
+                    aria-hidden
+                  />
+                )}
               </button>
             ))}
-
-            <button
-              type="button"
-              onClick={() => {
-                if (requireAuth("/?voice=1", t("voiceAssist.authMessage"))) {
-                  setVoiceOpen(true);
-                }
-              }}
-              className="group relative col-span-1 flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[#7a1a2a]/95 via-[#4a121c]/90 to-[#2a0c14]/90 p-4 text-left ring-1 ring-[#ffb020]/45 shadow-[0_18px_40px_-18px_rgba(255,176,32,0.45)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:ring-[#ffb020]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c0d14] sm:col-span-3 lg:col-span-1"
-            >
-              <span
-                className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full bg-[#ffb020]/20 blur-2xl transition group-hover:scale-125"
-                aria-hidden
-              />
-              <span className="relative flex size-[4.25rem] shrink-0 items-center justify-center rounded-2xl bg-white/5 ring-1 ring-white/15 transition group-hover:bg-white/10 sm:size-[4.5rem]">
-                <span className="absolute size-10 animate-ping rounded-full bg-[#ffb020]/30" aria-hidden />
-                <Mic className="relative size-9 text-[#ffd27a] sm:size-10" aria-hidden />
-              </span>
-              <span className="relative min-w-0 flex-1">
-                <span className="block truncate font-display text-lg font-extrabold tracking-tight text-white sm:text-xl">
-                  {t("hero.voiceTitle")}
-                </span>
-                <span className="mt-0.5 block text-sm text-white/65">
-                  {t("hero.voiceSub")}
-                </span>
-              </span>
-              <ArrowUpRight
-                className="relative size-5 shrink-0 text-[#ffd27a] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white"
-                aria-hidden
-              />
-            </button>
           </div>
         </div>
 
@@ -385,9 +421,22 @@ export function LandingHero() {
           <div className="flex justify-end">
             <LanguageSwitcher variant="hero" />
           </div>
+          <VoiceLaunchButton
+            className="mt-6 w-full"
+            onClick={openVoice}
+            title={t("hero.voiceTitle")}
+            subtitle={t("hero.voiceSub")}
+          />
           <HeroHelpStory className="mt-6" />
         </div>
       </div>
+
+      <VoiceLaunchButton
+        className="absolute bottom-4 left-4 right-4 z-30 mx-auto max-w-xl lg:hidden"
+        onClick={openVoice}
+        title={t("hero.voiceTitle")}
+        subtitle={t("hero.voiceSub")}
+      />
 
       {ngoDirectoryOpen ? (
         <NgoDirectoryModal

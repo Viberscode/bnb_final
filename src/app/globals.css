@@ -183,6 +183,21 @@ body {
   animation: float-soft 5s ease-in-out infinite;
 }
 
+@keyframes voice-ring {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.voice-ring {
+  animation: voice-ring 1.45s ease-out infinite;
+}
+
 @keyframes blood-flow {
   0% {
     background-position: 0% 50%;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Mic } from "lucide-react";
 import { useSignInPrompt } from "@/components/auth/sign-in-prompt";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { useLanguage } from "@/components/i18n/language-provider";
@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
+import { VoiceRequestAssistant } from "@/components/landing/voice-request-assistant";
 import { NgoDirectoryModal } from "@/components/ngo/ngo-directory-modal";
 import {
   fetchNgoProfile,
@@ -193,10 +194,11 @@ export function LandingHero() {
   const router = useRouter();
   const { requireAuth } = useSignInPrompt();
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, status: authStatus } = useAuth();
   const [ngoName, setNgoName] = useState<string | null>(null);
   const [ngoDirectoryOpen, setNgoDirectoryOpen] = useState(false);
   const [registeredNgos, setRegisteredNgos] = useState<NgoProfile[]>([]);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -225,9 +227,23 @@ export function LandingHero() {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("voice") !== "1") return;
+    if (authStatus === "loading") return;
+    if (authStatus !== "authenticated") {
+      requireAuth("/?voice=1", t("voiceAssist.authMessage"));
+      return;
+    }
+    setVoiceOpen(true);
+    params.delete("voice");
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+  }, [authStatus, requireAuth, router, t]);
+
   return (
     <section
-      className="relative isolate flex h-[100svh] max-h-[100svh] overflow-hidden bg-[#1c0d14]"
+      className="relative isolate flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[#1c0d14] lg:h-[100svh] lg:max-h-[100svh] lg:overflow-hidden"
       aria-labelledby="hero-brand"
     >
       <HeroLifeBackdrop />
@@ -327,6 +343,37 @@ export function LandingHero() {
                 />
               </button>
             ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (requireAuth("/?voice=1", t("voiceAssist.authMessage"))) {
+                  setVoiceOpen(true);
+                }
+              }}
+              className="group relative col-span-1 flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[#7a1a2a]/95 via-[#4a121c]/90 to-[#2a0c14]/90 p-4 text-left ring-1 ring-[#ffb020]/45 shadow-[0_18px_40px_-18px_rgba(255,176,32,0.45)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:ring-[#ffb020]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c0d14] sm:col-span-3 lg:col-span-1"
+            >
+              <span
+                className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full bg-[#ffb020]/20 blur-2xl transition group-hover:scale-125"
+                aria-hidden
+              />
+              <span className="relative flex size-[4.25rem] shrink-0 items-center justify-center rounded-2xl bg-white/5 ring-1 ring-white/15 transition group-hover:bg-white/10 sm:size-[4.5rem]">
+                <span className="absolute size-10 animate-ping rounded-full bg-[#ffb020]/30" aria-hidden />
+                <Mic className="relative size-9 text-[#ffd27a] sm:size-10" aria-hidden />
+              </span>
+              <span className="relative min-w-0 flex-1">
+                <span className="block truncate font-display text-lg font-extrabold tracking-tight text-white sm:text-xl">
+                  {t("hero.voiceTitle")}
+                </span>
+                <span className="mt-0.5 block text-sm text-white/65">
+                  {t("hero.voiceSub")}
+                </span>
+              </span>
+              <ArrowUpRight
+                className="relative size-5 shrink-0 text-[#ffd27a] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white"
+                aria-hidden
+              />
+            </button>
           </div>
         </div>
 
@@ -346,6 +393,13 @@ export function LandingHero() {
         <NgoDirectoryModal
           ngos={registeredNgos}
           onClose={() => setNgoDirectoryOpen(false)}
+        />
+      ) : null}
+
+      {voiceOpen ? (
+        <VoiceRequestAssistant
+          open={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
         />
       ) : null}
     </section>

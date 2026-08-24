@@ -1,5 +1,7 @@
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { donorMatchesRequest } from "@/lib/blood-compatibility";
+import { recordDonorNoShow } from "@/lib/donor-activity";
+import { NEARBY_HOSPITAL_RADIUS_KM } from "@/lib/geo";
 import { isActiveRequestStatus, urgencyRank } from "@/lib/live-requests";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -11,10 +13,17 @@ import type {
 } from "@/types";
 
 export const ASSIGNMENT_EVENT = "bloodkit:assignments";
+/** Time for a live donor to accept a tossed assignment. */
 export const ASSIGNMENT_WAIT_MS = 150_000;
+/** After a donor accepts, the request stays live for dual confirmation. */
+export const POST_ACCEPT_LIVE_MS = 5 * 60 * 1000;
+/** Nearby location filter — same radius as hospital matching. */
+export const NEARBY_DONOR_RADIUS_KM = NEARBY_HOSPITAL_RADIUS_KM;
+/** Random toss among the 2–3 nearest live donors. */
+export const TOSS_POOL_MAX = 3;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "5";
+const STORAGE_VERSION = "6";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 
@@ -151,6 +160,14 @@ export function isAssignedDonor(
 
 export function remainingMs(assignment?: DonorAssignment) {
   if (!assignment || assignment.status !== "pending") return 0;
+  return Math.max(0, new Date(assignment.expiresAt).getTime() - Date.now());
+}
+
+function liveWindowMs(assignment?: DonorAssignment) {
+  if (!assignment?.expiresAt) return 0;
+  if (assignment.status !== "pending" && assignment.status !== "accepted") {
+    return 0;
+  }
   return Math.max(0, new Date(assignment.expiresAt).getTime() - Date.now());
 }
 
@@ -375,16 +392,39 @@ export function pickNextDonor(
   declinedDonorIds: string[],
   takenIds: Set<string>,
 ) {
-  return donors
+  const nearby = donors
     .filter(
       (donor) =>
         donor.available &&
         !isOwnDonor(request, donor) &&
         !declinedDonorIds.includes(donor.id) &&
         !takenIds.has(donor.id) &&
-        donorMatchesRequest(donor.bloodGroup, request),
+        donorMatchesRequest(donor.bloodGroup, request) &&
+        donorDistanceKm(donor, request) <= NEARBY_DONOR_RADIUS_KM,
     )
-    .sort((a, b) => compareDonorsForRequest(a, b, request))[0];
+    .sort((a, b) => compareDonorsForRequest(a, b, request));
+
+  if (!nearby.length) return undefined;
+  const pool = nearby.slice(0, Math.min(TOSS_POOL_MAX, nearby.length));
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function rematchAfterMiss(
+  request: BloodRequest,
+  donors: DonorProfile[],
+  declinedDonorIds: string[],
+  takenIds: Set<string>,
+  allowCreate: boolean,
+  missedDonorId?: string,
+) {
+  const nextDeclined = [
+    ...new Set([...declinedDonorIds, ...(missedDonorId ? [missedDonorId] : [])]),
+  ];
+  if (!allowCreate) return searchingAssignment(nextDeclined);
+  const next = pickNextDonor(request, donors, nextDeclined, takenIds);
+  return next
+    ? makeAssignment(next, request, nextDeclined)
+    : searchingAssignment(nextDeclined);
 }
 
 function assignmentFingerprint(assignment?: DonorAssignment) {
@@ -423,42 +463,58 @@ function resolveRequestAssignment(
   const taken = busyDonorIds(store, request.id);
 
   if (assignmentMatchesRequester(request, current, donors)) {
-    if (!allowCreate) return searchingAssignment(declined);
-    const nextDeclined = [
-      ...new Set([...declined, ...(current?.donorId ? [current.donorId] : [])]),
-    ];
-    const next = pickNextDonor(request, donors, nextDeclined, taken);
-    return next
-      ? makeAssignment(next, request, nextDeclined)
-      : searchingAssignment(nextDeclined);
+    return rematchAfterMiss(
+      request,
+      donors,
+      declined,
+      taken,
+      allowCreate,
+      current?.donorId,
+    );
   }
 
-  if (current?.status === "accepted" && current.donorId) return current;
+  if (current?.status === "accepted" && current.donorId) {
+    if (liveWindowMs(current) > 0) return current;
+    void recordDonorNoShow(current.donorId, request.id);
+    void persistRequestStatus(request.id, "matching");
+    return rematchAfterMiss(
+      request,
+      donors,
+      declined,
+      taken,
+      allowCreate,
+      current.donorId,
+    );
+  }
 
   if (current?.status === "pending" && current.donorId) {
     if (remainingMs(current) > 0) return current;
-    if (!allowCreate) return searchingAssignment([...new Set([...declined, current.donorId])]);
-    const nextDeclined = [...new Set([...declined, current.donorId])];
-    const next = pickNextDonor(request, donors, nextDeclined, taken);
-    return next
-      ? makeAssignment(next, request, nextDeclined)
-      : searchingAssignment(nextDeclined);
+    void persistRequestStatus(request.id, "matching");
+    return rematchAfterMiss(
+      request,
+      donors,
+      declined,
+      taken,
+      allowCreate,
+      current.donorId,
+    );
   }
 
   if (!allowCreate) {
     return current ?? searchingAssignment(declined);
   }
 
-  if (current?.status === "declined" || current?.status === "expired") {
+  if (
+    current?.status === "declined" ||
+    current?.status === "expired" ||
+    current?.status === "searching" ||
+    !current
+  ) {
     const next = pickNextDonor(request, donors, declined, taken);
-    return next
-      ? makeAssignment(next, request, declined)
+    if (next) return makeAssignment(next, request, declined);
+    return current?.status === "searching"
+      ? current
       : searchingAssignment(declined);
-  }
-
-  if (current?.status === "searching") {
-    const next = pickNextDonor(request, donors, declined, taken);
-    return next ? makeAssignment(next, request, declined) : current;
   }
 
   const first = pickNextDonor(request, donors, declined, taken);
@@ -571,7 +627,13 @@ export async function respondToAssignment(
   }
 
   if (action === "accept") {
-    store[requestId] = { ...current, status: "accepted" };
+    const now = Date.now();
+    store[requestId] = {
+      ...current,
+      status: "accepted",
+      assignedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + POST_ACCEPT_LIVE_MS).toISOString(),
+    };
     writeStore(store);
     await persistAssignment(requestId, store[requestId]);
     await persistRequestStatus(requestId, "donor_accepted");
@@ -599,6 +661,10 @@ export async function waitForAnotherDonor(requestId: string) {
     (current.status !== "accepted" && current.status !== "pending")
   ) {
     return;
+  }
+
+  if (current.status === "accepted") {
+    await recordDonorNoShow(current.donorId, requestId);
   }
 
   store[requestId] = {

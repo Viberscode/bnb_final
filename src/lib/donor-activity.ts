@@ -105,6 +105,47 @@ export async function fetchDonorActivity(
   };
 }
 
+export async function recordDonorNoShow(donorId?: string | null, requestId?: string) {
+  if (!donorId) return;
+  if (typeof window !== "undefined" && requestId) {
+    const key = "bloodkit-noshows";
+    try {
+      const seen = new Set<string>(
+        JSON.parse(window.localStorage.getItem(key) || "[]") as string[],
+      );
+      const stamp = `${requestId}:${donorId}`;
+      if (seen.has(stamp)) return;
+      seen.add(stamp);
+      window.localStorage.setItem(key, JSON.stringify([...seen].slice(-80)));
+    } catch {
+      /* continue */
+    }
+  }
+
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return;
+
+  const { data } = await supabase
+    .from("donor_profiles")
+    .select("trust_score")
+    .eq("id", donorId)
+    .maybeSingle();
+  if (!data) return;
+
+  const trust = Number((data as { trust_score?: number }).trust_score ?? 72);
+  await supabase
+    .from("donor_profiles")
+    .update({
+      trust_score: Math.max(0, trust - 12),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", donorId);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DONOR_PROFILE_EVENT));
+  }
+}
+
 export async function recordVerifiedDonation(donorId?: string | null) {
   if (!donorId) return;
   const supabase = tryCreateClient();

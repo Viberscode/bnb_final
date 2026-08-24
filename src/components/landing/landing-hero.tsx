@@ -291,35 +291,12 @@ export function LandingHero() {
     >
       <HeroLifeBackdrop />
 
-      <div className="relative mx-auto grid h-full w-full max-w-6xl grid-cols-1 items-center gap-8 px-5 py-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-20">
+      <div className="relative mx-auto grid h-full w-full max-w-6xl grid-cols-1 items-center gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-20">
         <div className="max-w-xl">
           <BloodKitHeading id="hero-brand" />
 
-          <div className="animate-hero-reveal-delay-1 mt-5 flex flex-col gap-3 sm:mt-6">
-            <h1 className="font-display text-[clamp(1.05rem,2.4vw,1.45rem)] font-semibold uppercase tracking-[0.22em] text-white/90">
-              {t("hero.tagline")}
-            </h1>
-
-            <div
-              className="h-px w-16 bg-gradient-to-r from-[#ff2d4a] to-transparent sm:w-24"
-              aria-hidden
-            />
-
-            <svg
-              viewBox="0 0 360 28"
-              className="h-6 w-56 text-[#ff2d4a] sm:w-72"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M0 14H70L88 14L104 3L122 25L138 8L154 14H360"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="animate-pulse-line opacity-90"
-              />
-            </svg>
+          <div className="animate-hero-reveal-delay-1 mt-5 sm:mt-6">
+            <LanguageSwitcher variant="hero" />
           </div>
 
           <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-5 sm:mt-10 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
@@ -413,16 +390,9 @@ export function LandingHero() {
           </div>
         </div>
 
-        <div className="absolute right-5 top-[4.75rem] z-20 sm:right-8 lg:hidden">
-          <LanguageSwitcher variant="hero" />
-        </div>
-
         <div className="animate-hero-reveal-delay-2 hidden w-full max-w-md justify-self-end lg:block">
-          <div className="flex justify-end">
-            <LanguageSwitcher variant="hero" />
-          </div>
           <VoiceLaunchButton
-            className="mt-6 w-full"
+            className="w-full"
             onClick={openVoice}
             title={t("hero.voiceTitle")}
             subtitle={t("hero.voiceSub")}

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { CheckCircle2, Loader2, Radio, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import {
+  ASSIGNMENT_WAIT_MS,
   canViewAssignedDonor,
   canShareContactDetails,
   formatCountdown,
@@ -153,14 +154,15 @@ export function DonorSearchModal({
                 {pending ? t("match.donorTimer") : t("match.searchTimer")}
               </p>
               <p className="mt-1 font-display text-4xl font-black tracking-tight text-crimson">
-                {pending
-                  ? formatCountdown(wait)
-                  : formatCountdown(
-                      Date.now() - new Date(request.createdAt).getTime(),
-                    )}
-              </p>
-              <p className="mt-1 text-xs font-semibold text-ink-muted">
-                {t("match.priority")}
+                {formatCountdown(
+                  pending
+                    ? wait
+                    : Math.max(
+                        0,
+                        ASSIGNMENT_WAIT_MS -
+                          (Date.now() - new Date(request.createdAt).getTime()),
+                      ),
+                )}
               </p>
               {pending && canView ? (
                 <button

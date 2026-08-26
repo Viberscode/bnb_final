@@ -37,6 +37,7 @@ const en = {
     telegramTitle: "Join Telegram alerts",
     telegramSub: "Donors: get live blood requests in real time",
     telegramCta: "Join",
+    telegramSetup: "Add your channel link in .env.local to enable join",
   },
   voiceAssist: {
     kicker: "Requester voice help",
@@ -655,6 +656,7 @@ const hi: Messages = {
     telegramTitle: "Telegram अलर्ट जॉइन करें",
     telegramSub: "डोनर: लाइव रक्त अनुरोध रियल टाइम में पाएँ",
     telegramCta: "जॉइन",
+    telegramSetup: "जॉइन चालू करने के लिए .env.local में चैनल लिंक जोड़ें",
   },
   voiceAssist: {
     kicker: "अनुरोधकर्ता वॉइस मदद",

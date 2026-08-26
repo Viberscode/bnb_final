@@ -9,6 +9,29 @@ export function TelegramJoinButton({ className }: { className?: string }) {
   const { t } = useLanguage();
   const href = telegramChannelUrl();
 
+  if (!href) {
+    return (
+      <div
+        className={cn(
+          "inline-flex w-full items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3.5 text-left text-white/80",
+          className,
+        )}
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10">
+          <Send className="size-5" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base font-extrabold tracking-tight text-white">
+            {t("hero.telegramTitle")}
+          </span>
+          <span className="mt-0.5 block text-xs font-semibold sm:text-sm">
+            {t("hero.telegramSetup")}
+          </span>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <a
       href={href}

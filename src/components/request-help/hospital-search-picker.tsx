@@ -39,12 +39,17 @@ function withDistance(
   };
 }
 
+/** Default overview: Rohini Sector 9 / West metro — hospital icons visible on OSM. */
+const DEFAULT_MAP_CENTER = { lat: 28.7165, lng: 77.1178 };
+
+/** Neighborhood zoom so OSM hospital markers stay readable. */
 function osmEmbedUrl(lat: number, lng: number) {
-  const pad = 0.018;
-  const left = lng - pad;
-  const right = lng + pad;
-  const top = lat + pad;
-  const bottom = lat - pad;
+  const padLat = 0.0085;
+  const padLng = 0.011;
+  const left = lng - padLng;
+  const right = lng + padLng;
+  const top = lat + padLat;
+  const bottom = lat - padLat;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
 }
 
@@ -65,6 +70,11 @@ export function HospitalSearchPicker({
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<PickedHospital[]>([]);
   const mapHospital = value;
+  const mapCenter = mapHospital
+    ? { lat: mapHospital.lat, lng: mapHospital.lng }
+    : userCoords
+      ? { lat: userCoords.lat, lng: userCoords.lng }
+      : DEFAULT_MAP_CENTER;
 
   useEffect(() => {
     if (value?.name && value.name !== query) {
@@ -231,33 +241,18 @@ export function HospitalSearchPicker({
                 : ""}
             </p>
           ) : (
-            <p className="text-xs text-ink-muted">{t("request.hospitalMapEmpty")}</p>
+            <p className="text-xs text-ink-muted">{t("request.hospitalMapHint")}</p>
           )}
         </div>
         <div className="relative aspect-[16/9] w-full bg-[#e8f4f2]">
-          {mapHospital ? (
-            <iframe
-              key={`${mapHospital.lat},${mapHospital.lng}`}
-              title={t("request.hospitalMap")}
-              src={osmEmbedUrl(mapHospital.lat, mapHospital.lng)}
-              className="absolute inset-0 h-full w-full border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          ) : userCoords ? (
-            <iframe
-              key={`user-${userCoords.lat},${userCoords.lng}`}
-              title={t("request.hospitalMap")}
-              src={osmEmbedUrl(userCoords.lat, userCoords.lng)}
-              className="absolute inset-0 h-full w-full border-0 opacity-80"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-ink-muted">
-              {t("request.hospitalMapEmpty")}
-            </div>
-          )}
+          <iframe
+            key={`${mapCenter.lat.toFixed(5)},${mapCenter.lng.toFixed(5)},${mapHospital?.id ?? "default"}`}
+            title={t("request.hospitalMap")}
+            src={osmEmbedUrl(mapCenter.lat, mapCenter.lng)}
+            className="absolute inset-0 h-full w-full border-0"
+            loading="eager"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
       </div>
     </div>

@@ -6,7 +6,6 @@ import {
   Droplets,
   Loader2,
   MapPin,
-  Navigation,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -16,8 +15,6 @@ import { MockKycPanel } from "@/components/donor/mock-kyc-panel";
 import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
-import { reverseGeocode } from "@/lib/reverse-geocode";
-import { useLiveLocation } from "@/hooks/use-live-location";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { cn } from "@/lib/utils";
@@ -130,9 +127,6 @@ export function BecomeDonorForm() {
   const [error, setError] = useState<string | null>(null);
   const [isEdit, setIsEdit] = useState(false);
   const [kycVerified, setKycVerified] = useState(false);
-  const [manualLocation, setManualLocation] = useState(false);
-  const [resolvingPlace, setResolvingPlace] = useState(false);
-  const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
 
   useEffect(() => {
     if (user) {
@@ -155,6 +149,8 @@ export function BecomeDonorForm() {
       setBloodGroup(existing.bloodGroup);
       setPhone(indianMobileDigits(existing.phone));
       setEmail(existing.email ?? "");
+      setCity(existing.city);
+      setArea(existing.area);
       setAvailable(existing.available);
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
@@ -164,25 +160,6 @@ export function BecomeDonorForm() {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!coords || manualLocation) return;
-    let active = true;
-    setResolvingPlace(true);
-    const timer = window.setTimeout(() => {
-      void reverseGeocode(coords.lat, coords.lng, locale).then((place) => {
-        if (!active) return;
-        setResolvingPlace(false);
-        if (!place) return;
-        setCity(place.city);
-        setArea(place.area);
-      });
-    }, 350);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [coords, manualLocation, locale]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -214,10 +191,6 @@ export function BecomeDonorForm() {
     if (mobile.length !== 10) {
       setPhoneTouched(true);
       setError(t("donor.errPhoneDigits"));
-      return;
-    }
-    if (!coords) {
-      setError(t("donor.errLocation"));
       return;
     }
     if (!city.trim() || !area.trim()) {
@@ -449,60 +422,7 @@ export function BecomeDonorForm() {
         icon={MapPin}
         delayMs={340}
       >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-          <div className="flex flex-wrap items-center gap-2 text-ink-muted">
-            <Navigation className="size-4 text-teal" aria-hidden />
-            {locStatus === "loading" && (
-              <span className="inline-flex items-center gap-1.5">
-                <Loader2 className="size-3.5 animate-spin" /> {t("donor.gettingLocation")}
-              </span>
-            )}
-            {locStatus === "tracking" && coords && (
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-xs font-bold text-teal-deep">
-                  <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  {t("request.live")}
-                </span>
-                <span className="font-semibold text-ink">
-                  {t("donor.gpsAccuracy", { m: Math.round(coords.accuracy) })}
-                </span>
-                <span className="text-xs font-semibold tabular-nums text-ink-muted">
-                  {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-                </span>
-              </span>
-            )}
-            {locStatus === "denied" && <span>{t("request.locationBlocked")}</span>}
-            {locStatus === "unavailable" && (
-              <span>{t("request.locationUnavailable")}</span>
-            )}
-          </div>
-          {(locStatus === "denied" || locStatus === "unavailable") && (
-            <button
-              type="button"
-              onClick={retryLocation}
-              className="rounded-lg bg-teal-soft px-2.5 py-1 text-xs font-bold text-teal-deep hover:bg-teal/20"
-            >
-              {t("request.tryAgain")}
-            </button>
-          )}
-        </div>
-        {locStatus === "tracking" && coords ? (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-teal-deep">
-              {resolvingPlace && !city ? t("donor.readingAddress") : t("donor.liveArea")}
-            </p>
-            {manualLocation ? (
-              <button
-                type="button"
-                onClick={() => setManualLocation(false)}
-                className="rounded-lg bg-teal-soft px-2.5 py-1 text-xs font-bold text-teal-deep hover:bg-teal/20"
-              >
-                {t("donor.followLive")}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
+        <p className="mb-3 text-sm text-ink-muted">{t("donor.locationManualHint")}</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-bold text-ink">
@@ -510,12 +430,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={city}
-              onChange={(e) => {
-                setManualLocation(true);
-                setCity(e.target.value);
-              }}
+              onChange={(e) => setCity(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="New Delhi"
+              autoComplete="address-level2"
               required
             />
           </label>
@@ -525,12 +443,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={area}
-              onChange={(e) => {
-                setManualLocation(true);
-                setArea(e.target.value);
-              }}
+              onChange={(e) => setArea(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="Saket / Dwarka / …"
+              autoComplete="address-level3"
               required
             />
           </label>

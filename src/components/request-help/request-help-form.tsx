@@ -10,7 +10,6 @@ import {
   Hospital as HospitalIcon,
   Loader2,
   MapPin,
-  Navigation,
   Sparkles,
   UserRound,
   Users,
@@ -22,17 +21,16 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
+import {
+  HospitalSearchPicker,
+  type PickedHospital,
+} from "@/components/request-help/hospital-search-picker";
 import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
 import { BloodGroupMark, BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
-import { DEMO_HOSPITALS, URGENCY_OPTIONS } from "@/data/demo";
+import { URGENCY_OPTIONS } from "@/data/demo";
 import { useLiveLocation } from "@/hooks/use-live-location";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
-import {
-  formatDistance,
-  getNearbyPlaces,
-  NEARBY_HOSPITAL_RADIUS_KM,
-} from "@/lib/geo";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
@@ -48,7 +46,6 @@ import { uploadVoiceNote } from "@/lib/voice-notes";
 import { cn } from "@/lib/utils";
 import type { BloodGroup, BloodRequest, DonorProfile, UrgencyLevel } from "@/types";
 
-type NearbyHospital = (typeof DEMO_HOSPITALS)[number] & { distanceKm: number };
 type PanelTone = "crimson" | "amber" | "teal" | "slate";
 
 const MIN_PEOPLE = 2;
@@ -137,14 +134,16 @@ export function RequestHelpForm() {
     {},
   );
   const [urgency, setUrgency] = useState<UrgencyLevel | null>(null);
-  const [hospitalId, setHospitalId] = useState<string | null>(null);
+  const [selectedHospital, setSelectedHospital] = useState<PickedHospital | null>(
+    null,
+  );
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [units, setUnits] = useState(1);
   const [notes, setNotes] = useState("");
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
-  const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
+  const { coords } = useLiveLocation();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeRequest, setActiveRequest] = useState<BloodRequest | null>(null);
@@ -176,12 +175,6 @@ export function RequestHelpForm() {
     liveActive && canViewAssignedDonor(liveActive, liveActive.assignment, user?.id),
   );
 
-  const nearby = useMemo<NearbyHospital[]>(() => {
-    if (!coords) return [];
-    return getNearbyPlaces(DEMO_HOSPITALS, coords.lat, coords.lng);
-  }, [coords]);
-
-  const selectedHospital = nearby.find((h) => h.id === hospitalId) ?? null;
   const blockedByActive = Boolean(liveActive);
 
   function setPeopleAffected(next: number) {
@@ -200,12 +193,6 @@ export function RequestHelpForm() {
       return keptGroups;
     });
   }
-
-  useEffect(() => {
-    if (hospitalId && !nearby.some((h) => h.id === hospitalId)) {
-      setHospitalId(null);
-    }
-  }, [nearby, hospitalId]);
 
   useEffect(() => {
     let active = true;
@@ -284,13 +271,7 @@ export function RequestHelpForm() {
       return;
     }
     if (!selectedHospital) {
-      if (!coords) {
-        setError(t("request.errLocation"));
-      } else if (nearby.length === 0) {
-        setError(t("request.noHospitals", { km: NEARBY_HOSPITAL_RADIUS_KM }));
-      } else {
-        setError(t("request.errHospital"));
-      }
+      setError(t("request.errHospital"));
       return;
     }
     if (!contactName.trim()) {
@@ -906,99 +887,11 @@ export function RequestHelpForm() {
         icon={HospitalIcon}
         delayMs={240}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <div className="flex flex-wrap items-center gap-2 text-ink-muted">
-            <Navigation className="size-4 text-teal" aria-hidden />
-            {locStatus === "loading" && (
-              <span className="inline-flex items-center gap-1.5">
-                <Loader2 className="size-3.5 animate-spin" /> {t("request.gettingLocation")}
-              </span>
-            )}
-            {locStatus === "tracking" && coords && (
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-soft px-2 py-0.5 text-xs font-bold text-teal-deep">
-                  <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  {t("request.live")}
-                </span>
-                {t("request.withinKm", {
-                  km: NEARBY_HOSPITAL_RADIUS_KM,
-                  m: Math.round(coords.accuracy),
-                })}
-              </span>
-            )}
-            {locStatus === "denied" && (
-              <span>{t("request.locationBlocked")}</span>
-            )}
-            {locStatus === "unavailable" && (
-              <span>{t("request.locationUnavailable")}</span>
-            )}
-          </div>
-          {(locStatus === "denied" || locStatus === "unavailable") && (
-            <button
-              type="button"
-              onClick={retryLocation}
-              className="rounded-lg bg-teal-soft px-2.5 py-1 text-xs font-bold text-teal-deep hover:bg-teal/20"
-            >
-              {t("request.tryAgain")}
-            </button>
-          )}
-        </div>
-
-        <div className="mt-4 max-h-80 space-y-2.5 overflow-y-auto rounded-2xl bg-white/70 p-2 ring-1 ring-teal/15">
-          {locStatus === "loading" ? (
-            <p className="px-3 py-8 text-center text-sm text-ink-muted">
-              {t("request.findingHospitals")}
-            </p>
-          ) : !coords ? (
-            <p className="px-3 py-8 text-center text-sm text-ink-muted">
-              {t("request.allowLocation")}
-            </p>
-          ) : nearby.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-ink-muted">
-              {t("request.noHospitals", { km: NEARBY_HOSPITAL_RADIUS_KM })}
-            </p>
-          ) : (
-            nearby.map((hospital) => {
-              const selected = hospitalId === hospital.id;
-              return (
-                <button
-                  key={hospital.id}
-                  type="button"
-                  onClick={() => setHospitalId(hospital.id)}
-                  className={cn(
-                    "flex w-full items-start gap-3 rounded-xl border px-3.5 py-3.5 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal",
-                    selected
-                      ? "border-teal bg-teal-soft/70 shadow-sm"
-                      : "border-transparent bg-white/60 hover:border-teal/25 hover:bg-white",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition",
-                      selected
-                        ? "bg-gradient-to-br from-teal to-teal-deep text-white shadow-[0_12px_22px_-10px_rgba(13,115,112,0.75)]"
-                        : "bg-ink/5 text-ink-muted",
-                    )}
-                  >
-                    <HospitalIcon className="size-4" aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-ink">
-                      {hospital.name}
-                    </span>
-                    <span className="mt-0.5 flex items-center gap-1 text-xs text-ink-muted">
-                      <MapPin className="size-3 shrink-0" aria-hidden />
-                      {hospital.area}, {hospital.city}
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-teal-soft px-2.5 py-1 text-xs font-bold tabular-nums text-teal-deep">
-                    {formatDistance(hospital.distanceKm)}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
+        <HospitalSearchPicker
+          value={selectedHospital}
+          onChange={setSelectedHospital}
+          userCoords={coords}
+        />
       </StepPanel>
 
       <StepPanel

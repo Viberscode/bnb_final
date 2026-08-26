@@ -16,7 +16,7 @@ import type { MessagePath } from "@/components/i18n/language-provider";
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { useLiveLocation } from "@/hooks/use-live-location";
 import { startAssignmentForRequest } from "@/lib/donor-assignment";
-import { fetchRegisteredDonors } from "@/lib/donor-profile";
+import { fetchAvailableDonors } from "@/lib/donor-profile";
 import { notifyDonorsRequestIsLive } from "@/lib/notify-donors";
 import {
   formatDistance,
@@ -501,7 +501,7 @@ export function VoiceRequestAssistant({
           notes: current.notes.trim() || undefined,
           distanceKm: hospital.distanceKm,
         });
-        const donors = (await fetchRegisteredDonors()).filter(
+        const donors = (await fetchAvailableDonors()).filter(
           (donor) => donor.id !== user?.id,
         );
         const owned = user?.id

@@ -12,17 +12,20 @@ function siteOrigin(request: Request) {
 }
 
 function inviteMessage(input: {
+  requesterName: string;
+  requesterPhone: string;
   group: string;
   hospital: string;
   urgency: string;
   link: string;
 }) {
   return [
-    "BloodNearby: a blood request is LIVE now.",
+    "BloodNearby — LIVE blood request",
+    `Requester: ${input.requesterName}`,
+    `Call / WhatsApp requester: ${input.requesterPhone}`,
     `Need: ${input.group} · ${input.urgency} · ${input.hospital}`,
-    "Open this link and tap Accept if you can donate. Only donors who accept can be matched — even if you are offline right now.",
+    "Open this link to Accept if you can donate:",
     input.link,
-    "If you ignore or decline, you will not be assigned.",
   ].join("\n\n");
 }
 
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
   const { data: liveRequest, error } = await supabase
     .from("blood_requests")
     .select(
-      "id, user_id, blood_group, blood_groups, hospital_name, urgency, status",
+      "id, user_id, blood_group, blood_groups, hospital_name, urgency, status, contact_name, phone",
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -80,8 +83,12 @@ export async function POST(request: Request) {
     return true;
   });
 
+  const requesterName = String(liveRequest.contact_name || "Requester").trim();
+  const requesterPhone = String(liveRequest.phone || "").trim() || "not shared";
   const link = `${siteOrigin(request)}/invite/${requestId}`;
   const bodyText = inviteMessage({
+    requesterName,
+    requesterPhone,
     group: groups.length ? groups.join(", ") : liveRequest.blood_group,
     hospital: liveRequest.hospital_name || "the hospital",
     urgency: String(liveRequest.urgency ?? "urgent"),

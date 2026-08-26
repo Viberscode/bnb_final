@@ -79,8 +79,7 @@ export function rankRequestsForDonor(
     .filter(
       (request) =>
         !isOwnDonor(request, donor) &&
-        donorMatchesRequest(donor.bloodGroup, request) &&
-        (request.assignment?.eligibleDonorIds ?? []).includes(donor.id),
+        donorMatchesRequest(donor.bloodGroup, request),
     )
     .sort((a, b) => {
       const urgency = compareRequestsByPriority(a, b);
@@ -411,26 +410,23 @@ export function pickNextDonor(
   donors: DonorProfile[],
   declinedDonorIds: string[],
   takenIds: Set<string>,
-  eligibleDonorIds: string[] = [],
+  _eligibleDonorIds: string[] = [],
 ) {
-  if (!eligibleDonorIds.length) return undefined;
-  const eligible = new Set(eligibleDonorIds);
-  const accepted = donors.filter(
+  // After WhatsApp notifies everyone: available → blood match → nearby → toss
+  const available = donors.filter(
     (donor) =>
-      eligible.has(donor.id) &&
+      donor.available &&
       !isOwnDonor(request, donor) &&
       !declinedDonorIds.includes(donor.id) &&
       !takenIds.has(donor.id) &&
       donorMatchesRequest(donor.bloodGroup, request),
   );
-  const nearby = accepted
+  const nearby = available
     .filter((donor) => donorDistanceKm(donor, request) <= NEARBY_DONOR_RADIUS_KM)
     .sort((a, b) => compareDonorsForRequest(a, b, request));
-  const ranked = (
-    nearby.length
-      ? nearby
-      : [...accepted].sort((a, b) => compareDonorsForRequest(a, b, request))
-  );
+  const ranked = nearby.length
+    ? nearby
+    : [...available].sort((a, b) => compareDonorsForRequest(a, b, request));
   if (!ranked.length) return undefined;
   const pool = ranked.slice(0, Math.min(TOSS_POOL_MAX, ranked.length));
   return pool[Math.floor(Math.random() * pool.length)];

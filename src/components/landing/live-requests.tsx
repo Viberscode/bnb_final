@@ -37,7 +37,7 @@ import {
   startAssignmentForRequest,
   withAssignments,
 } from "@/lib/donor-assignment";
-import { fetchDonorProfile, fetchRegisteredDonors } from "@/lib/donor-profile";
+import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
   fetchLiveRequests,
@@ -560,7 +560,7 @@ export function LiveRequests({
       const [rows, profile, nextDonors] = await Promise.all([
         fetchLiveRequests(),
         fetchDonorProfile(user?.id),
-        fetchRegisteredDonors(),
+        fetchAvailableDonors(),
       ]);
       if (!active) return;
       setRequests(rows);

@@ -79,6 +79,7 @@ export interface DonorAssignment {
   assignedAt: string;
   expiresAt: string;
   declinedDonorIds: string[];
+  eligibleDonorIds?: string[];
 }
 
 export interface UrgencyOption {

@@ -231,6 +231,27 @@ export async function fetchMyLiveRequests(
     .filter((request) => createdAfterReset(request.createdAt));
 }
 
+/** Fetch one request by id (live or closed) so invite links can resolve. */
+export async function fetchRequestById(
+  requestId: string,
+): Promise<BloodRequest | null> {
+  const id = requestId.trim();
+  if (!id) return null;
+
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return null;
+
+  const { data, error } = await supabase
+    .from("blood_requests")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const request = mapRow(data as BloodRequestRow);
+  return createdAfterReset(request.createdAt) ? request : null;
+}
+
 /** Returns the user's current open request, if any. */
 export async function fetchActiveRequestForUser(
   userId?: string,

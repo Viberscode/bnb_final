@@ -243,7 +243,15 @@ export function BecomeDonorForm() {
         age: age ? Number(age) : undefined,
         notes,
       });
-      window.location.assign("/profile/donor");
+      const rawNext = new URLSearchParams(window.location.search).get("next");
+      const next =
+        rawNext &&
+        rawNext.startsWith("/") &&
+        !rawNext.startsWith("//") &&
+        !rawNext.startsWith("/\\")
+          ? rawNext
+          : null;
+      window.location.assign(next ?? "/profile/donor");
     } catch (err) {
       setError(
         err instanceof Error

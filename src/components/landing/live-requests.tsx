@@ -19,6 +19,7 @@ import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
+import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { ContactPhone } from "@/components/request-help/contact-phone";
 import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
@@ -27,6 +28,7 @@ import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compati
 import { formatDistance } from "@/lib/geo";
 import {
   canShareContactDetails,
+  canViewAssignedDonor,
   isAssignedDonor,
   isOwnDonor,
   rankRequestsForDonor,
@@ -35,7 +37,7 @@ import {
   startAssignmentForRequest,
   withAssignments,
 } from "@/lib/donor-assignment";
-import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
+import { fetchDonorProfile, fetchRegisteredDonors } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
   fetchLiveRequests,
@@ -111,6 +113,7 @@ function RequestCard({
   onOpen,
   onAccepted,
   onWaitMore,
+  onViewDonor,
 }: {
   request: BloodRequest;
   highlighted?: boolean;
@@ -121,6 +124,7 @@ function RequestCard({
   onOpen?: () => void;
   onAccepted?: () => void;
   onWaitMore?: () => void;
+  onViewDonor?: () => void;
 }) {
   const { t } = useLanguage();
   const done = request.status === "completed";
@@ -277,6 +281,7 @@ function RequestCard({
           assignment={request.assignment}
           viewer={isMine && !done ? "requester" : "public"}
           requestId={isMine && !done ? request.id : undefined}
+          onViewDonor={isMine && !done ? onViewDonor : undefined}
         />
         {isMine && !done ? (
           <RequesterConfirmPanel
@@ -542,6 +547,7 @@ export function LiveRequests({
   const [openRequest, setOpenRequest] = useState<BloodRequest | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [waitingId, setWaitingId] = useState<string | null>(null);
+  const [donorDetails, setDonorDetails] = useState<BloodRequest | null>(null);
   const pool =
     donor && !donors.some((item) => item.id === donor.id)
       ? [...donors, donor]
@@ -554,7 +560,7 @@ export function LiveRequests({
       const [rows, profile, nextDonors] = await Promise.all([
         fetchLiveRequests(),
         fetchDonorProfile(user?.id),
-        fetchAvailableDonors(),
+        fetchRegisteredDonors(),
       ]);
       if (!active) return;
       setRequests(rows);
@@ -731,6 +737,13 @@ export function LiveRequests({
                     }
                   : undefined
               }
+              onViewDonor={
+                user?.id &&
+                request.userId === user.id &&
+                canViewAssignedDonor(request, request.assignment, user.id)
+                  ? () => setDonorDetails(request)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -778,6 +791,16 @@ export function LiveRequests({
               openRequest.userId,
             );
           }}
+        />
+      ) : null}
+      {donorDetails?.assignment?.donorId ? (
+        <AssignedDonorDetails
+          assignment={
+            (sorted.find((item) => item.id === donorDetails.id) ?? donorDetails)
+              .assignment!
+          }
+          requestId={donorDetails.id}
+          onClose={() => setDonorDetails(null)}
         />
       ) : null}
     </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, HeartHandshake, MapPin, X } from "lucide-react";
+import { ArrowUpRight, Check, CheckCircle2, HeartHandshake, MapPin, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import {
   canShareContactDetails,
@@ -45,9 +45,51 @@ export function AssignedDonorLine({
     const label = accepted
       ? t("match.searchDone")
       : t("match.waiting", { time: formatCountdown(wait) });
+
+    if (accepted) {
+      return (
+        <div
+          className="mt-3 overflow-hidden rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4 shadow-[0_16px_36px_-18px_rgba(5,150,105,0.55)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white">
+            <CheckCircle2 className="size-3.5" aria-hidden />
+            {t("live.donorAccepted")}
+          </p>
+          <p className="mt-2 font-display text-2xl font-black leading-tight tracking-tight text-ink sm:text-[1.7rem]">
+            {label}
+          </p>
+          {assignment?.donorName ? (
+            <p className="mt-1 text-sm font-bold text-emerald-800">
+              {assignment.donorName}
+              {assignment.bloodGroup ? (
+                <>
+                  {" · "}
+                  <BloodGroupText group={assignment.bloodGroup} />
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {onViewDonor && assignment?.donorId ? (
+            <button
+              type="button"
+              onClick={onViewDonor}
+              className="mt-3 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-deep px-4 text-base font-black uppercase tracking-wide text-white shadow-[0_14px_28px_-12px_rgba(5,150,105,0.8)] hover:brightness-110"
+            >
+              {t("match.viewDonor")}
+              <ArrowUpRight className="size-5" aria-hidden />
+            </button>
+          ) : null}
+          {matchedRequestId && showWhatsApp ? (
+            <WhatsAppConnectButton requestId={matchedRequestId} className="mt-2" />
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="mt-2">
-        {(pending || accepted) && onViewDonor && assignment?.donorId ? (
+        {pending && onViewDonor && assignment?.donorId ? (
           <button
             type="button"
             onClick={onViewDonor}

@@ -35,7 +35,8 @@ import {
 } from "@/lib/geo";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
-import { fetchAvailableDonors } from "@/lib/donor-profile";
+import { fetchRegisteredDonors } from "@/lib/donor-profile";
+import { notifyDonorsRequestIsLive } from "@/lib/notify-donors";
 import {
   addLiveRequest,
   cancelLiveRequest,
@@ -222,7 +223,7 @@ export function RequestHelpForm() {
       setCheckingActive(true);
       const [existing, donors] = await Promise.all([
         fetchActiveRequestForUser(user.id),
-        fetchAvailableDonors(),
+        fetchRegisteredDonors(),
       ]);
       if (!active) return;
       setDonors(donors);
@@ -345,12 +346,13 @@ export function RequestHelpForm() {
         voiceNoteUrl,
         distanceKm: selectedHospital.distanceKm,
       });
-      const nextDonors = (await fetchAvailableDonors()).filter(
+      const nextDonors = (await fetchRegisteredDonors()).filter(
         (donor) => donor.id !== user?.id,
       );
       const owned = user?.id
         ? { ...request, userId: request.userId ?? user.id }
         : request;
+      void notifyDonorsRequestIsLive(owned.id);
       const assigned = await startAssignmentForRequest(owned, nextDonors);
       setDonors(nextDonors);
       setActiveRequest(assigned ?? owned);

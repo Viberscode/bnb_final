@@ -16,7 +16,8 @@ import type { MessagePath } from "@/components/i18n/language-provider";
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { useLiveLocation } from "@/hooks/use-live-location";
 import { startAssignmentForRequest } from "@/lib/donor-assignment";
-import { fetchAvailableDonors } from "@/lib/donor-profile";
+import { fetchRegisteredDonors } from "@/lib/donor-profile";
+import { notifyDonorsRequestIsLive } from "@/lib/notify-donors";
 import {
   formatDistance,
   getNearbyPlaces,
@@ -500,12 +501,13 @@ export function VoiceRequestAssistant({
           notes: current.notes.trim() || undefined,
           distanceKm: hospital.distanceKm,
         });
-        const donors = (await fetchAvailableDonors()).filter(
+        const donors = (await fetchRegisteredDonors()).filter(
           (donor) => donor.id !== user?.id,
         );
         const owned = user?.id
           ? { ...request, userId: request.userId ?? user.id }
           : request;
+        void notifyDonorsRequestIsLive(owned.id);
         await startAssignmentForRequest(owned, donors);
         if (!still()) return;
         setStatus("done");

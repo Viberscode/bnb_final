@@ -10,7 +10,7 @@ import {
   subscribeAssignments,
   syncAssignments,
 } from "@/lib/donor-assignment";
-import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
+import { fetchDonorProfile, fetchRegisteredDonors } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
   subscribeLiveRequests,
@@ -73,7 +73,7 @@ export function DonorMatchAlert() {
       const [rows, profile, nextDonors] = await Promise.all([
         fetchLiveRequests(),
         fetchDonorProfile(user.id),
-        fetchAvailableDonors(),
+        fetchRegisteredDonors(),
       ]);
       if (!active) return;
 

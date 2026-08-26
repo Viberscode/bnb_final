@@ -157,8 +157,12 @@ create table if not exists public.request_assignments (
   assigned_at timestamptz not null default now(),
   expires_at timestamptz not null default now(),
   declined_donor_ids text[] not null default '{}',
+  eligible_donor_ids text[] not null default '{}',
   updated_at timestamptz not null default now()
 );
+
+alter table public.request_assignments
+  add column if not exists eligible_donor_ids text[] not null default '{}';
 
 alter table public.request_assignments enable row level security;
 

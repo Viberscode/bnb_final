@@ -23,7 +23,7 @@ export const NEARBY_DONOR_RADIUS_KM = NEARBY_HOSPITAL_RADIUS_KM;
 export const TOSS_POOL_MAX = 3;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "6";
+const STORAGE_VERSION = "7";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 
@@ -79,7 +79,8 @@ export function rankRequestsForDonor(
     .filter(
       (request) =>
         !isOwnDonor(request, donor) &&
-        donorMatchesRequest(donor.bloodGroup, request),
+        donorMatchesRequest(donor.bloodGroup, request) &&
+        (request.assignment?.eligibleDonorIds ?? []).includes(donor.id),
     )
     .sort((a, b) => {
       const urgency = compareRequestsByPriority(a, b);
@@ -223,6 +224,11 @@ function toAssignment(row: Record<string, unknown>): DonorAssignment | null {
       : Array.isArray(row.declinedDonorIds)
         ? (row.declinedDonorIds as string[])
         : [],
+    eligibleDonorIds: Array.isArray(row.eligible_donor_ids)
+      ? (row.eligible_donor_ids as string[])
+      : Array.isArray(row.eligibleDonorIds)
+        ? (row.eligibleDonorIds as string[])
+        : [],
   };
 }
 
@@ -304,22 +310,30 @@ async function persistAssignment(requestId: string, assignment: DonorAssignment)
   if (!canUseRemoteAssignments()) return;
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) return;
-  const { error } = await supabase.from("request_assignments").upsert(
-    {
-      request_id: requestId,
-      donor_id: assignment.donorId || null,
-      donor_name: assignment.donorName,
-      blood_group: assignment.bloodGroup,
-      donations_completed: assignment.donationsCompleted,
-      distance_km: assignment.distanceKm,
-      status: assignment.status,
-      assigned_at: assignment.assignedAt,
-      expires_at: assignment.expiresAt,
-      declined_donor_ids: assignment.declinedDonorIds,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "request_id" },
-  );
+  const payload = {
+    request_id: requestId,
+    donor_id: assignment.donorId || null,
+    donor_name: assignment.donorName,
+    blood_group: assignment.bloodGroup,
+    donations_completed: assignment.donationsCompleted,
+    distance_km: assignment.distanceKm,
+    status: assignment.status,
+    assigned_at: assignment.assignedAt,
+    expires_at: assignment.expiresAt,
+    declined_donor_ids: assignment.declinedDonorIds,
+    eligible_donor_ids: assignment.eligibleDonorIds ?? [],
+    updated_at: new Date().toISOString(),
+  };
+  let { error } = await supabase.from("request_assignments").upsert(payload, {
+    onConflict: "request_id",
+  });
+  if (error && /eligible_donor_ids/i.test(error.message)) {
+    const { eligible_donor_ids: _drop, ...withoutEligible } = payload;
+    const retry = await supabase
+      .from("request_assignments")
+      .upsert(withoutEligible, { onConflict: "request_id" });
+    error = retry.error;
+  }
   if (error) {
     if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
     return;
@@ -342,6 +356,7 @@ function makeAssignment(
   donor: DonorProfile,
   request: BloodRequest,
   declinedDonorIds: string[],
+  eligibleDonorIds: string[] = [],
 ): DonorAssignment {
   const now = Date.now();
   return {
@@ -354,10 +369,14 @@ function makeAssignment(
     assignedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ASSIGNMENT_WAIT_MS).toISOString(),
     declinedDonorIds,
+    eligibleDonorIds,
   };
 }
 
-function searchingAssignment(declinedDonorIds: string[]): DonorAssignment {
+function searchingAssignment(
+  declinedDonorIds: string[],
+  eligibleDonorIds: string[] = [],
+): DonorAssignment {
   const now = Date.now();
   return {
     donorId: "",
@@ -369,6 +388,7 @@ function searchingAssignment(declinedDonorIds: string[]): DonorAssignment {
     assignedAt: new Date(now).toISOString(),
     expiresAt: new Date(now).toISOString(),
     declinedDonorIds,
+    eligibleDonorIds,
   };
 }
 
@@ -391,21 +411,28 @@ export function pickNextDonor(
   donors: DonorProfile[],
   declinedDonorIds: string[],
   takenIds: Set<string>,
+  eligibleDonorIds: string[] = [],
 ) {
-  const nearby = donors
-    .filter(
-      (donor) =>
-        donor.available &&
-        !isOwnDonor(request, donor) &&
-        !declinedDonorIds.includes(donor.id) &&
-        !takenIds.has(donor.id) &&
-        donorMatchesRequest(donor.bloodGroup, request) &&
-        donorDistanceKm(donor, request) <= NEARBY_DONOR_RADIUS_KM,
-    )
+  if (!eligibleDonorIds.length) return undefined;
+  const eligible = new Set(eligibleDonorIds);
+  const accepted = donors.filter(
+    (donor) =>
+      eligible.has(donor.id) &&
+      !isOwnDonor(request, donor) &&
+      !declinedDonorIds.includes(donor.id) &&
+      !takenIds.has(donor.id) &&
+      donorMatchesRequest(donor.bloodGroup, request),
+  );
+  const nearby = accepted
+    .filter((donor) => donorDistanceKm(donor, request) <= NEARBY_DONOR_RADIUS_KM)
     .sort((a, b) => compareDonorsForRequest(a, b, request));
-
-  if (!nearby.length) return undefined;
-  const pool = nearby.slice(0, Math.min(TOSS_POOL_MAX, nearby.length));
+  const ranked = (
+    nearby.length
+      ? nearby
+      : [...accepted].sort((a, b) => compareDonorsForRequest(a, b, request))
+  );
+  if (!ranked.length) return undefined;
+  const pool = ranked.slice(0, Math.min(TOSS_POOL_MAX, ranked.length));
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -416,15 +443,17 @@ function rematchAfterMiss(
   takenIds: Set<string>,
   allowCreate: boolean,
   missedDonorId?: string,
+  eligibleDonorIds: string[] = [],
 ) {
   const nextDeclined = [
     ...new Set([...declinedDonorIds, ...(missedDonorId ? [missedDonorId] : [])]),
   ];
-  if (!allowCreate) return searchingAssignment(nextDeclined);
-  const next = pickNextDonor(request, donors, nextDeclined, takenIds);
+  const eligible = (eligibleDonorIds ?? []).filter((id) => id !== missedDonorId);
+  if (!allowCreate) return searchingAssignment(nextDeclined, eligible);
+  const next = pickNextDonor(request, donors, nextDeclined, takenIds, eligible);
   return next
-    ? makeAssignment(next, request, nextDeclined)
-    : searchingAssignment(nextDeclined);
+    ? makeAssignment(next, request, nextDeclined, eligible)
+    : searchingAssignment(nextDeclined, eligible);
 }
 
 function assignmentFingerprint(assignment?: DonorAssignment) {
@@ -435,6 +464,7 @@ function assignmentFingerprint(assignment?: DonorAssignment) {
     assignment.assignedAt,
     assignment.expiresAt,
     assignment.declinedDonorIds.join(","),
+    (assignment.eligibleDonorIds ?? []).join(","),
   ].join("|");
 }
 
@@ -460,6 +490,7 @@ function resolveRequestAssignment(
 
   const current = store[request.id];
   const declined = current?.declinedDonorIds ?? [];
+  const eligible = current?.eligibleDonorIds ?? [];
   const taken = busyDonorIds(store, request.id);
 
   if (assignmentMatchesRequester(request, current, donors)) {
@@ -470,6 +501,7 @@ function resolveRequestAssignment(
       taken,
       allowCreate,
       current?.donorId,
+      eligible,
     );
   }
 
@@ -484,6 +516,7 @@ function resolveRequestAssignment(
       taken,
       allowCreate,
       current.donorId,
+      eligible,
     );
   }
 
@@ -497,11 +530,12 @@ function resolveRequestAssignment(
       taken,
       allowCreate,
       current.donorId,
+      eligible,
     );
   }
 
   if (!allowCreate) {
-    return current ?? searchingAssignment(declined);
+    return current ?? searchingAssignment(declined, eligible);
   }
 
   if (
@@ -510,17 +544,17 @@ function resolveRequestAssignment(
     current?.status === "searching" ||
     !current
   ) {
-    const next = pickNextDonor(request, donors, declined, taken);
-    if (next) return makeAssignment(next, request, declined);
+    const next = pickNextDonor(request, donors, declined, taken, eligible);
+    if (next) return makeAssignment(next, request, declined, eligible);
     return current?.status === "searching"
-      ? current
-      : searchingAssignment(declined);
+      ? { ...current, eligibleDonorIds: eligible }
+      : searchingAssignment(declined, eligible);
   }
 
-  const first = pickNextDonor(request, donors, declined, taken);
+  const first = pickNextDonor(request, donors, declined, taken, eligible);
   return first
-    ? makeAssignment(first, request, declined)
-    : searchingAssignment(declined);
+    ? makeAssignment(first, request, declined, eligible)
+    : searchingAssignment(declined, eligible);
 }
 
 export async function syncAssignments(
@@ -645,6 +679,7 @@ export async function respondToAssignment(
     ...current,
     status: "declined",
     declinedDonorIds: [...new Set([...current.declinedDonorIds, donorId])],
+    eligibleDonorIds: (current.eligibleDonorIds ?? []).filter((id) => id !== donorId),
   };
   writeStore(store);
   await persistAssignment(requestId, store[requestId]);
@@ -671,11 +706,79 @@ export async function waitForAnotherDonor(requestId: string) {
     ...current,
     status: "declined",
     declinedDonorIds: [...new Set([...current.declinedDonorIds, current.donorId])],
+    eligibleDonorIds: (current.eligibleDonorIds ?? []).filter(
+      (id) => id !== current.donorId,
+    ),
   };
   writeStore(store);
   await persistAssignment(requestId, store[requestId]);
   await persistRequestStatus(requestId, "matching");
   notifyLive();
+}
+
+/** WhatsApp / invite reply: only donors who accept become eligible to match. */
+export async function respondToRequestInvite(
+  requestId: string,
+  donor: DonorProfile,
+  action: "accept" | "decline",
+  request?: BloodRequest,
+) {
+  await fetchRemoteStore(true);
+  const store = readMergedStore();
+  const current = store[requestId] ?? searchingAssignment([], []);
+  if (request && isOwnDonor(request, donor)) {
+    return current;
+  }
+
+  let declined = current.declinedDonorIds ?? [];
+  let eligible = current.eligibleDonorIds ?? [];
+
+  if (action === "decline") {
+    declined = [...new Set([...declined, donor.id])];
+    eligible = eligible.filter((id) => id !== donor.id);
+    const next: DonorAssignment =
+      current.donorId === donor.id
+        ? searchingAssignment(declined, eligible)
+        : { ...current, declinedDonorIds: declined, eligibleDonorIds: eligible };
+    store[requestId] = next;
+    writeStore(store);
+    await persistAssignment(requestId, next);
+    notifyLive();
+    return next;
+  }
+
+  declined = declined.filter((id) => id !== donor.id);
+  eligible = [...new Set([...eligible, donor.id])];
+  let next: DonorAssignment = {
+    ...current,
+    declinedDonorIds: declined,
+    eligibleDonorIds: eligible,
+  };
+
+  const canAssignNow =
+    request &&
+    (!current.donorId ||
+      current.status === "searching" ||
+      current.status === "declined" ||
+      current.status === "expired");
+  if (canAssignNow) {
+    const taken = busyDonorIds(store, requestId);
+    const picked = pickNextDonor(request, [donor], declined, taken, eligible);
+    if (picked) {
+      next = makeAssignment(picked, request, declined, eligible);
+    } else {
+      next = searchingAssignment(declined, eligible);
+    }
+  }
+
+  store[requestId] = next;
+  writeStore(store);
+  await persistAssignment(requestId, next);
+  if (next.status === "pending") {
+    await persistRequestStatus(requestId, "matching");
+  }
+  notifyLive();
+  return next;
 }
 
 const assignmentListeners = new Set<() => void>();

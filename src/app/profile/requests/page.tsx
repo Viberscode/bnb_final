@@ -12,7 +12,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
-import { fetchAvailableDonors } from "@/lib/donor-profile";
+import { fetchRegisteredDonors } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
   fetchMyLiveRequests,
@@ -55,7 +55,7 @@ export default function MyRequestsPage() {
     const refresh = async () => {
       const [next, nextDonors] = await Promise.all([
         fetchMyLiveRequests(user?.id),
-        fetchAvailableDonors(),
+        fetchRegisteredDonors(),
       ]);
       if (!active) return;
       setMyRequests(next);

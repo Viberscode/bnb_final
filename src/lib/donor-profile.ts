@@ -46,15 +46,17 @@ function mapRow(row: DonorRow): DonorProfile {
 }
 
 export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
+  return (await fetchRegisteredDonors()).filter((donor) => donor.available);
+}
+
+/** Every registered donor, including those currently offline. */
+export async function fetchRegisteredDonors(): Promise<DonorProfile[]> {
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) {
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("donor_profiles")
-    .select("*")
-    .eq("available", true);
+  const { data, error } = await supabase.from("donor_profiles").select("*");
 
   if (error || !data?.length) {
     return [];

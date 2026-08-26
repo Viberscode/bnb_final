@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { donorMatchesRequest, neededBloodGroups } from "@/lib/blood-compatibility";
 import {
-  BLOOD_GROUPS,
-  canReceiveFrom,
-  neededBloodGroups,
-} from "@/lib/blood-compatibility";
-import {
-  isTelegramConfigured,
-  sendTelegramChannelMessage,
+  isTelegramBotConfigured,
+  sendTelegramMessage,
+  syncTelegramUpdates,
 } from "@/lib/telegram";
 import type { BloodGroup } from "@/types";
 
@@ -17,30 +14,24 @@ function siteOrigin(request: Request) {
   return new URL(request.url).origin;
 }
 
-function eligibleDonorGroups(need: BloodGroup[]) {
-  const set = new Set<BloodGroup>();
-  for (const group of need) {
-    for (const donor of canReceiveFrom(group)) set.add(donor);
-  }
-  return BLOOD_GROUPS.filter((group) => set.has(group));
-}
-
-function liveRequestMessage(input: {
+function personalMessage(input: {
+  name: string;
   groups: string;
-  eligible: string;
   hospital: string;
   urgency: string;
   link: string;
 }) {
   return [
-    "🩸 <b>BloodNearby — LIVE request</b>",
+    "🩸 <b>BloodNearby — LIVE request for you</b>",
+    "",
+    `Hi ${input.name || "donor"},`,
+    `A request matching your blood group is live.`,
     "",
     `<b>Need:</b> ${input.groups}`,
     `<b>Urgency:</b> ${input.urgency}`,
     `<b>Hospital:</b> ${input.hospital}`,
     "",
-    `<b>Eligible donor groups:</b> ${input.eligible}`,
-    "If your group matches, open the link and help:",
+    "Open this link if you can donate:",
     input.link,
   ].join("\n");
 }
@@ -84,36 +75,72 @@ export async function POST(request: Request) {
     );
   }
 
-  const need = neededBloodGroups({
+  const need = {
     bloodGroup: liveRequest.blood_group as BloodGroup,
     bloodGroups: (liveRequest.blood_groups ?? []) as BloodGroup[],
-  });
-  const eligible = eligibleDonorGroups(need);
+  };
+  const groups = neededBloodGroups(need);
   const link = `${siteOrigin(request)}/invite/${requestId}`;
-  const text = liveRequestMessage({
-    groups: need.join(", "),
-    eligible: eligible.join(", "),
-    hospital: liveRequest.hospital_name || "the hospital",
-    urgency: String(liveRequest.urgency ?? "urgent"),
-    link,
-  });
 
-  if (!isTelegramConfigured()) {
+  if (!isTelegramBotConfigured()) {
     return NextResponse.json({
       ok: true,
-      sent: false,
+      sent: 0,
       link,
-      warning:
-        "Telegram is not configured. Add TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, and NEXT_PUBLIC_TELEGRAM_CHANNEL_URL.",
+      warning: "Telegram bot is not configured. Add TELEGRAM_BOT_TOKEN.",
     });
   }
 
-  await sendTelegramChannelMessage(text);
+  // Pick up any /start link taps (works on localhost without a public webhook)
+  await syncTelegramUpdates();
+
+  const { data: donors } = await supabase
+    .from("donor_profiles")
+    .select("id, full_name, blood_group, telegram_chat_id")
+    .not("telegram_chat_id", "is", null);
+
+  const recipients = ((donors ?? []) as {
+    id: string;
+    full_name: string | null;
+    blood_group: string;
+    telegram_chat_id: string | null;
+  }[]).filter((donor) => {
+    if (!donor.telegram_chat_id) return false;
+    if (donor.id === liveRequest.user_id || donor.id === user.id) return false;
+    return donorMatchesRequest(donor.blood_group as BloodGroup, need);
+  });
+
+  let sent = 0;
+  let failed = 0;
+  const queue = [...recipients];
+  const workers = Array.from({ length: Math.min(6, queue.length || 1) }, async () => {
+    while (queue.length) {
+      const donor = queue.shift();
+      if (!donor?.telegram_chat_id) return;
+      try {
+        await sendTelegramMessage(
+          donor.telegram_chat_id,
+          personalMessage({
+            name: donor.full_name?.split(" ")[0] || "donor",
+            groups: groups.join(", "),
+            hospital: liveRequest.hospital_name || "the hospital",
+            urgency: String(liveRequest.urgency ?? "urgent"),
+            link,
+          }),
+        );
+        sent += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+  });
+  await Promise.all(workers);
 
   return NextResponse.json({
     ok: true,
-    sent: true,
+    sent,
+    failed,
+    total: recipients.length,
     link,
-    eligibleGroups: eligible,
   });
 }

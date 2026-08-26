@@ -22,6 +22,8 @@ type DonorRow = {
   lives_helped: number;
   avg_response_minutes: number;
   joined_at: string;
+  telegram_chat_id?: string | null;
+  telegram_username?: string | null;
 };
 
 function mapRow(row: DonorRow): DonorProfile {
@@ -42,6 +44,8 @@ function mapRow(row: DonorRow): DonorProfile {
     livesHelped: row.lives_helped,
     avgResponseMinutes: row.avg_response_minutes,
     joinedAt: row.joined_at,
+    telegramChatId: row.telegram_chat_id ?? undefined,
+    telegramUsername: row.telegram_username ?? undefined,
   };
 }
 

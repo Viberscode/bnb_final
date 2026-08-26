@@ -27,9 +27,16 @@ create table if not exists public.donor_profiles (
   trust_score integer not null default 72,
   lives_helped integer not null default 0,
   avg_response_minutes integer not null default 14,
+  telegram_chat_id text,
+  telegram_username text,
   joined_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.donor_profiles
+  add column if not exists telegram_chat_id text;
+alter table public.donor_profiles
+  add column if not exists telegram_username text;
 
 -- Live blood requests (realtime)
 create table if not exists public.blood_requests (

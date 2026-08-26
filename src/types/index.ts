@@ -106,6 +106,8 @@ export interface DonorProfile {
   livesHelped: number;
   avgResponseMinutes: number;
   joinedAt: string;
+  telegramChatId?: string;
+  telegramUsername?: string;
 }
 
 export interface NgoProfile {

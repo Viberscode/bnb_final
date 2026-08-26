@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
+import { TelegramJoinButton } from "@/components/landing/telegram-join-button";
 import { VoiceRequestAssistant } from "@/components/landing/voice-request-assistant";
 import { NgoDirectoryModal } from "@/components/ngo/ngo-directory-modal";
 import {
@@ -297,6 +298,10 @@ export function LandingHero() {
 
           <div className="animate-hero-reveal-delay-1 mt-5 sm:mt-6">
             <LanguageSwitcher variant="hero" />
+          </div>
+
+          <div className="animate-hero-reveal-delay-1 mt-4 max-w-md">
+            <TelegramJoinButton />
           </div>
 
           <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-5 sm:mt-10 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">

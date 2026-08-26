@@ -34,6 +34,9 @@ const en = {
     life: "Life",
     voiceTitle: "Speak to request blood",
     voiceSub: "No form — Hindi or English",
+    telegramTitle: "Join Telegram alerts",
+    telegramSub: "Donors: get live blood requests in real time",
+    telegramCta: "Join",
   },
   voiceAssist: {
     kicker: "Requester voice help",
@@ -366,7 +369,7 @@ const en = {
   match: {
     assigned: "Assigned donor",
     youAreAssigned: "You are assigned",
-    searching: "Notifying donors on WhatsApp, then matching available donors nearby…",
+    searching: "Notifying eligible donors on Telegram, then matching available donors nearby…",
     donations: "{n} successful donations",
     priority: "Priority: urgency → distance → successful donations",
     waiting: "Waiting for donor response · {time}",
@@ -377,7 +380,7 @@ const en = {
     liveMatch: "Live matching",
     searchTitle: "Searching for a donor",
     searchBody:
-      "WhatsApp went to every registered donor. Next we match available donors, then by location.",
+      "Telegram alert went to the donor channel for eligible blood groups. Next we match available donors, then by location.",
     searchWaiting: "Donor found — waiting",
     searchWaitingBody:
       "A donor has been assigned. They have a short window to confirm they can come.",
@@ -649,6 +652,9 @@ const hi: Messages = {
     life: "जीवन",
     voiceTitle: "बोलकर खून माँगें",
     voiceSub: "फ़ॉर्म नहीं — हिंदी या अंग्रेज़ी",
+    telegramTitle: "Telegram अलर्ट जॉइन करें",
+    telegramSub: "डोनर: लाइव रक्त अनुरोध रियल टाइम में पाएँ",
+    telegramCta: "जॉइन",
   },
   voiceAssist: {
     kicker: "अनुरोधकर्ता वॉइस मदद",
@@ -981,7 +987,7 @@ const hi: Messages = {
   match: {
     assigned: "असाइन डोनर",
     youAreAssigned: "आप असाइन हैं",
-    searching: "डोनरों को WhatsApp भेजकर उपलब्ध पास के डोनर से मैच हो रहा है…",
+    searching: "Telegram पर योग्य डोनर को सूचित कर उपलब्ध पास के डोनर से मैच हो रहा है…",
     donations: "{n} सफल दान",
     priority: "प्राथमिकता: तात्कालिकता → दूरी → सफल दान",
     waiting: "डोनर जवाब का इंतज़ार · {time}",
@@ -992,7 +998,7 @@ const hi: Messages = {
     liveMatch: "लाइव मैचिंग",
     searchTitle: "डोनर खोजा जा रहा है",
     searchBody:
-      "हर रजिस्टर्ड डोनर को WhatsApp गया है। फिर उपलब्ध डोनर, फिर लोकेशन से मैच होता है।",
+      "योग्य ब्लड ग्रुप के लिए Telegram चैनल पर अलर्ट गया। फिर उपलब्ध डोनर, फिर लोकेशन से मैच होता है।",
     searchWaiting: "डोनर मिला — इंतज़ार",
     searchWaitingBody:
       "एक डोनर असाइन हो गया है। उनके पास पुष्टि करने के लिए थोड़ा समय है।",

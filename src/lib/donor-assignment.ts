@@ -23,7 +23,7 @@ export const NEARBY_DONOR_RADIUS_KM = NEARBY_HOSPITAL_RADIUS_KM;
 export const TOSS_POOL_MAX = 3;
 const STORAGE_KEY = "bloodkit-assignments";
 const STORAGE_VERSION_KEY = "bloodkit-assignments-v";
-const STORAGE_VERSION = "7";
+const STORAGE_VERSION = "8";
 
 type AssignmentStore = Record<string, DonorAssignment>;
 

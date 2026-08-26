@@ -244,15 +244,19 @@ export function HospitalSearchPicker({
             <p className="text-xs text-ink-muted">{t("request.hospitalMapHint")}</p>
           )}
         </div>
-        <div className="relative aspect-[16/9] w-full bg-[#e8f4f2]">
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#e8f4f2]">
           <iframe
             key={`${mapCenter.lat.toFixed(5)},${mapCenter.lng.toFixed(5)},${mapHospital?.id ?? "default"}`}
             title={t("request.hospitalMap")}
             src={osmEmbedUrl(mapCenter.lat, mapCenter.lng)}
-            className="absolute inset-0 h-full w-full border-0"
+            className="pointer-events-auto absolute inset-x-0 top-0 h-[calc(100%+2.75rem)] w-full border-0"
             loading="eager"
             referrerPolicy="no-referrer-when-downgrade"
           />
+          {/* Clip OSM embed footer; keep a compact required credit */}
+          <p className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/85 px-1.5 py-0.5 text-[0.6rem] font-medium text-ink-muted">
+            © OpenStreetMap
+          </p>
         </div>
       </div>
     </div>

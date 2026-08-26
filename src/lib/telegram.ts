@@ -2,7 +2,10 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { createAnonServerClient } from "@/lib/supabase/admin";
 
 export function isTelegramBotConfigured() {
-  return Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
+  const token = (process.env.TELEGRAM_BOT_TOKEN ?? "")
+    .replace(/^\uFEFF/, "")
+    .trim();
+  return token.length > 10 && token.includes(":");
 }
 
 export function telegramBotUsernameFromEnv() {

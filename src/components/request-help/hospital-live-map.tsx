@@ -97,18 +97,15 @@ export function HospitalLiveMap({
 
       const map = L.map(containerRef.current, {
         zoomControl: true,
-        attributionControl: true,
+        attributionControl: false,
         scrollWheelZoom: true,
       }).setView([center.lat, center.lng], 14);
 
-      // Clean basemap without OSM's baked-in hospital + icons (those weren't clickable).
+      // Free Esri street tiles — no API key, no baked-in hospital POI icons.
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
         {
-          maxZoom: 20,
-          subdomains: "abcd",
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          maxZoom: 19,
         },
       ).addTo(map);
 

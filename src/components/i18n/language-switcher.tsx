@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Globe } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { LOCALES } from "@/lib/i18n/messages";
@@ -13,23 +14,116 @@ export function LanguageSwitcher({
 }) {
   const { locale, setLocale, t } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const current = LOCALES.find((item) => item.id === locale) ?? LOCALES[0];
+
+  const isHero = variant === "hero";
+  const isSolid = variant === "header-solid";
+  const alignRight = !isHero;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const isHero = variant === "hero";
-  const isSolid = variant === "header-solid";
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setMenuStyle(null);
+      return;
+    }
+
+    const update = () => {
+      const r = buttonRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.max(r.width, isHero ? r.width : 144);
+      setMenuStyle({
+        position: "fixed",
+        top: r.bottom + 6,
+        ...(alignRight
+          ? { right: Math.max(8, window.innerWidth - r.right), left: "auto" }
+          : { left: r.left, right: "auto" }),
+        minWidth: width,
+        zIndex: 200,
+      });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, alignRight, isHero]);
+
+  const menu =
+    open && mounted && menuStyle
+      ? createPortal(
+          <ul
+            ref={menuRef}
+            id="language-switcher-menu"
+            role="listbox"
+            style={menuStyle}
+            className={cn(
+              "overflow-hidden rounded-xl py-1 shadow-[0_16px_40px_-18px_rgba(0,0,0,0.65)]",
+              isHero || variant === "header"
+                ? "border border-white/15 bg-[#1c0d14]/95 backdrop-blur-md"
+                : "border border-line bg-white shadow-lg",
+              isHero ? "rounded-md" : "",
+            )}
+          >
+            {LOCALES.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={item.id === locale}
+                  onClick={() => {
+                    setLocale(item.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between px-3.5 py-2 text-left text-sm font-bold hover:bg-black/[0.04]",
+                    isHero || variant === "header"
+                      ? "text-white/85 hover:bg-white/10"
+                      : "text-ink",
+                    item.id === locale &&
+                      (isHero || variant === "header"
+                        ? "bg-white/12 text-white"
+                        : "bg-crimson-soft text-crimson"),
+                  )}
+                >
+                  {item.native}
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )
+      : null;
 
   return (
-    <div ref={rootRef} className={cn("relative", isHero ? "inline-block" : "")}>
+    <div
+      ref={rootRef}
+      className={cn("relative", isHero ? "inline-block" : "", open && "z-50")}
+    >
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -58,44 +152,7 @@ export function LanguageSwitcher({
           aria-hidden
         />
       </button>
-      {open ? (
-        <ul
-          role="listbox"
-          className={cn(
-            "absolute z-30 mt-1.5 overflow-hidden rounded-xl py-1 shadow-[0_16px_40px_-18px_rgba(0,0,0,0.65)]",
-            isHero || variant === "header"
-              ? "border border-white/15 bg-[#1c0d14]/95 backdrop-blur-md"
-              : "border border-line bg-white shadow-lg",
-            isHero ? "left-0 min-w-full rounded-md" : "right-0 min-w-36",
-          )}
-        >
-          {LOCALES.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={item.id === locale}
-                onClick={() => {
-                  setLocale(item.id);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center justify-between px-3.5 py-2 text-left text-sm font-bold hover:bg-black/[0.04]",
-                  isHero || variant === "header"
-                    ? "text-white/85 hover:bg-white/10"
-                    : "text-ink",
-                  item.id === locale &&
-                    (isHero || variant === "header"
-                      ? "bg-white/12 text-white"
-                      : "bg-crimson-soft text-crimson"),
-                )}
-              >
-                {item.native}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {menu}
     </div>
   );
 }

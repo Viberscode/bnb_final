@@ -184,7 +184,7 @@ export function NetworkStatus({ stats }: NetworkStatusProps) {
   return (
     <section
       id="network"
-      className="relative scroll-mt-20 overflow-hidden bg-blood-flow px-5 py-12 sm:px-8 sm:py-14"
+      className="relative scroll-mt-20 overflow-x-clip bg-blood-flow px-5 py-12 sm:px-8 sm:py-14"
       aria-labelledby="network-heading"
     >
       <div className="pointer-events-none absolute inset-0 bg-dot-grid opacity-30" aria-hidden />

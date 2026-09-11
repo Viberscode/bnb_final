@@ -8,8 +8,13 @@ import {
 
 export async function GET() {
   if (!isTelegramBotConfigured()) {
+    const onVercel = Boolean(process.env.VERCEL);
     return NextResponse.json(
-      { error: "Telegram bot token is not configured." },
+      {
+        error: onVercel
+          ? "Telegram bot token is not configured on Vercel. Add TELEGRAM_BOT_TOKEN (and NEXT_PUBLIC_TELEGRAM_BOT_USERNAME) in Project Settings → Environment Variables, then Redeploy."
+          : "Telegram bot token is not configured. Add TELEGRAM_BOT_TOKEN to .env.local and restart the dev server.",
+      },
       { status: 503 },
     );
   }

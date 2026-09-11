@@ -10,7 +10,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
-import { TelegramJoinButton } from "@/components/landing/telegram-join-button";
 import { VoiceRequestAssistant } from "@/components/landing/voice-request-assistant";
 import { NgoDirectoryModal } from "@/components/ngo/ngo-directory-modal";
 import {
@@ -287,21 +286,17 @@ export function LandingHero() {
 
   return (
     <section
-      className="relative isolate flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[#1c0d14] lg:h-[100svh] lg:max-h-[100svh] lg:overflow-hidden"
+      className="relative isolate flex min-h-[100svh] overflow-x-clip bg-[#1c0d14]"
       aria-labelledby="hero-brand"
     >
       <HeroLifeBackdrop />
 
-      <div className="relative mx-auto grid h-full w-full max-w-6xl grid-cols-1 items-center gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-20">
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-20">
         <div className="max-w-xl">
           <BloodKitHeading id="hero-brand" />
 
-          <div className="animate-hero-reveal-delay-1 mt-5 sm:mt-6">
+          <div className="animate-hero-reveal-delay-1 relative z-20 mt-5 sm:mt-6">
             <LanguageSwitcher variant="hero" />
-          </div>
-
-          <div className="animate-hero-reveal-delay-1 mt-4 max-w-md">
-            <TelegramJoinButton />
           </div>
 
           <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-5 sm:mt-10 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">

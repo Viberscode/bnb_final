@@ -262,6 +262,7 @@ export function VoiceRequestAssistant({
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<VoiceDraft>(EMPTY_DRAFT);
   const [field, setField] = useState<AskField>("blood");
+  const [showSpeakCue, setShowSpeakCue] = useState(false);
 
   const ioRef = useRef(createVoiceIo());
   const draftRef = useRef(draft);
@@ -312,34 +313,58 @@ export function VoiceRequestAssistant({
       const hospitals = nearbyRef.current;
       const index = current.hospitalIndex % Math.max(hospitals.length, 1);
       const option = hospitals[index];
-      let text = "";
-      if (next === "blood") text = say(lang, "voiceAssist.speakBlood");
-      if (next === "units") text = say(lang, "voiceAssist.speakUnits");
-      if (next === "urgency") text = say(lang, "voiceAssist.speakUrgency");
+      let spoken = "";
+      let visible = "";
+      if (next === "blood") {
+        spoken = say(lang, "voiceAssist.speakBlood");
+        visible = say(lang, "voiceAssist.askBlood");
+      }
+      if (next === "units") {
+        spoken = say(lang, "voiceAssist.speakUnits");
+        visible = say(lang, "voiceAssist.askUnits");
+      }
+      if (next === "urgency") {
+        spoken = say(lang, "voiceAssist.speakUrgency");
+        visible = say(lang, "voiceAssist.askUrgency");
+      }
       if (next === "hospital") {
-        text = option
-          ? say(lang, "voiceAssist.speakHospital", {
-              name: option.name,
-              km: formatDistance(option.distanceKm),
-            })
-          : say(lang, "voiceAssist.speakHospitalNone");
+        if (option) {
+          spoken = say(lang, "voiceAssist.speakHospital", {
+            name: option.name,
+            km: formatDistance(option.distanceKm),
+          });
+          visible = say(lang, "voiceAssist.askHospital");
+        } else {
+          spoken = say(lang, "voiceAssist.speakHospitalNone");
+          visible = say(lang, "voiceAssist.askHospitalNone");
+        }
       }
       if (next === "name") {
-        text = suggestedName
-          ? say(lang, "voiceAssist.speakName", { name: suggestedName })
-          : say(lang, "voiceAssist.speakNameAsk");
+        if (suggestedName) {
+          spoken = say(lang, "voiceAssist.speakName", { name: suggestedName });
+          visible = say(lang, "voiceAssist.askNameConfirm", {
+            name: suggestedName,
+          });
+        } else {
+          spoken = say(lang, "voiceAssist.speakNameAsk");
+          visible = say(lang, "voiceAssist.askName");
+        }
       }
-      if (next === "phone") text = say(lang, "voiceAssist.speakPhone");
+      if (next === "phone") {
+        spoken = say(lang, "voiceAssist.speakPhone");
+        visible = say(lang, "voiceAssist.askPhone");
+      }
       if (next === "confirm") {
-        text = say(lang, "voiceAssist.speakConfirm", {
+        spoken = say(lang, "voiceAssist.speakConfirm", {
           summary: summaryOf(current, lang),
         });
+        visible = say(lang, "voiceAssist.askConfirm");
       }
       setField(next);
-      setPrompt(text);
+      setShowSpeakCue(false);
+      setPrompt(visible);
       setStatus("speaking");
-      // Speak and arm the mic in parallel so listening starts the moment TTS ends.
-      const speakPromise = io.speak(text, lang);
+      const speakPromise = io.speak(spoken, lang);
       void io.warmMic();
       await speakPromise;
     }
@@ -398,6 +423,10 @@ export function VoiceRequestAssistant({
 
         setStatus("listening");
         setCaption("");
+        setShowSpeakCue(true);
+        window.setTimeout(() => {
+          if (still()) setShowSpeakCue(false);
+        }, 3500);
         const heard = await io.listen(
           localeRef.current,
           (text) => {
@@ -623,10 +652,15 @@ export function VoiceRequestAssistant({
 
         <div className="flex flex-1 flex-col items-center overflow-y-auto px-5 py-6">
           <div className="relative flex size-36 items-center justify-center">
-            {status === "listening" || status === "speaking" ? (
+            {status === "listening" ? (
               <>
-                <span className="voice-ring absolute inset-0 rounded-full bg-[#ff2d4a]/35" />
-                <span className="voice-ring absolute inset-2 rounded-full bg-[#ff2d4a]/25 [animation-delay:250ms]" />
+                <span className="voice-ring absolute inset-0 rounded-full bg-[#0f9f7a]/35" />
+                <span className="voice-ring absolute inset-2 rounded-full bg-[#0f9f7a]/25 [animation-delay:250ms]" />
+              </>
+            ) : status === "speaking" ? (
+              <>
+                <span className="voice-ring absolute inset-0 rounded-full bg-teal/30" />
+                <span className="voice-ring absolute inset-2 rounded-full bg-teal/20 [animation-delay:250ms]" />
               </>
             ) : null}
             <button
@@ -639,12 +673,12 @@ export function VoiceRequestAssistant({
                 }
               }}
               className={cn(
-                "relative flex size-24 items-center justify-center rounded-full text-white shadow-[0_18px_40px_-12px_rgba(255,45,74,0.8)] transition",
+                "relative flex size-24 items-center justify-center rounded-full text-white transition",
                 status === "listening"
-                  ? "bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22]"
+                  ? "bg-gradient-to-br from-[#14b8a6] to-[#0a6b54] shadow-[0_18px_40px_-12px_rgba(15,159,122,0.9)] ring-4 ring-[#0f9f7a]/35"
                   : status === "speaking"
-                    ? "bg-gradient-to-br from-teal to-teal-deep"
-                    : "bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22]",
+                    ? "bg-gradient-to-br from-teal to-teal-deep shadow-[0_18px_40px_-12px_rgba(13,115,112,0.8)]"
+                    : "bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] shadow-[0_18px_40px_-12px_rgba(255,45,74,0.8)]",
               )}
               aria-label={t("voiceAssist.tapSpeak")}
             >
@@ -654,9 +688,19 @@ export function VoiceRequestAssistant({
                 <Mic className="size-9" aria-hidden />
               )}
             </button>
+            {status === "listening" && showSpeakCue ? (
+              <span className="pointer-events-none absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 translate-y-full rounded-full bg-[#0f9f7a] px-4 py-1.5 font-display text-sm font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_24px_-10px_rgba(15,159,122,0.9)]">
+                {t("voiceAssist.speakNow")}
+              </span>
+            ) : null}
           </div>
 
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#ff8a9a]">
+          <p
+            className={cn(
+              "mt-8 text-xs font-black uppercase tracking-[0.18em]",
+              status === "listening" ? "text-[#5eead4]" : "text-[#ff8a9a]",
+            )}
+          >
             {status === "listening"
               ? t("voiceAssist.listening")
               : status === "speaking"
@@ -686,7 +730,7 @@ export function VoiceRequestAssistant({
                 }`
               : ""}
           </p>
-          <p className="mt-2 max-w-sm text-center font-display text-xl font-extrabold leading-snug tracking-tight text-white">
+          <p className="mt-3 max-w-sm text-center font-display text-[1.65rem] font-black leading-tight tracking-tight text-white sm:text-3xl">
             {prompt || t("voiceAssist.body")}
           </p>
           {caption ? (

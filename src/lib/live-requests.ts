@@ -6,6 +6,16 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export const LIVE_REQUESTS_EVENT = "bloodkit:live-requests";
 
+/** Public live feed only shows requests from the last 24 hours. */
+export const LIVE_REQUEST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export function isWithinLiveWindow(iso?: string | null, now = Date.now()) {
+  if (!iso) return false;
+  const created = new Date(iso).getTime();
+  if (!Number.isFinite(created)) return false;
+  return now - created <= LIVE_REQUEST_MAX_AGE_MS;
+}
+
 type BloodRequestRow = {
   id: string;
   user_id: string | null;
@@ -179,17 +189,20 @@ export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
   "donor_enroute",
 ];
 
-/** Fetch live requests from Supabase. */
+/** Fetch live requests from Supabase (last 24 hours only). */
 export async function fetchLiveRequests(): Promise<BloodRequest[]> {
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) {
     return [];
   }
 
+  const since = new Date(Date.now() - LIVE_REQUEST_MAX_AGE_MS).toISOString();
+
   const { data, error } = await supabase
     .from("blood_requests")
     .select("*")
     .in("status", [...ACTIVE_REQUEST_STATUSES, "completed"])
+    .gte("created_at", since)
     .order("created_at", { ascending: false });
 
   if (error || !data) {
@@ -197,9 +210,14 @@ export async function fetchLiveRequests(): Promise<BloodRequest[]> {
     return [];
   }
 
+  const now = Date.now();
   return (data as BloodRequestRow[])
     .map(mapRow)
-    .filter((request) => createdAfterReset(request.createdAt));
+    .filter(
+      (request) =>
+        createdAfterReset(request.createdAt) &&
+        isWithinLiveWindow(request.createdAt, now),
+    );
 }
 
 export function isActiveRequestStatus(status: RequestStatus): boolean {

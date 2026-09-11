@@ -641,6 +641,58 @@ export async function startAssignmentForRequest(
   return next;
 }
 
+/**
+ * Instantly offer a pending accept/decline window to a donor who opened a request.
+ * Writes locally first so Accept/Decline can render with no network wait.
+ */
+export function offerAssignmentToDonor(
+  request: BloodRequest,
+  donor: DonorProfile,
+): BloodRequest {
+  if (isOwnDonor(request, donor)) return request;
+  if (!isActiveRequestStatus(request.status) && request.status !== "completed") {
+    return request;
+  }
+  if (!donor.available) return request;
+  if (!donorMatchesRequest(donor.bloodGroup, request)) return request;
+
+  const store = readMergedStore();
+  const current = store[request.id];
+  const declined = current?.declinedDonorIds ?? [];
+  if (declined.includes(donor.id)) {
+    return { ...request, assignment: current };
+  }
+
+  if (
+    current?.donorId === donor.id &&
+    (current.status === "pending" || current.status === "accepted")
+  ) {
+    return { ...request, assignment: current };
+  }
+
+  if (
+    current?.donorId &&
+    current.donorId !== donor.id &&
+    (current.status === "pending" || current.status === "accepted") &&
+    remainingMs(current) > 0
+  ) {
+    return { ...request, assignment: current };
+  }
+
+  const eligible = [...new Set([...(current?.eligibleDonorIds ?? []), donor.id])];
+  const next = makeAssignment(donor, request, declined, eligible);
+  store[request.id] = next;
+  writeStore(store);
+  void persistAssignment(request.id, next);
+  void persistRequestStatus(request.id, "matching");
+  notifyLive();
+  return {
+    ...request,
+    assignment: next,
+    status: request.status === "pending" ? "matching" : request.status,
+  };
+}
+
 export async function respondToAssignment(
   requestId: string,
   donorId: string,

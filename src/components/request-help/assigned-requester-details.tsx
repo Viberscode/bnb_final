@@ -153,29 +153,31 @@ export function AssignedRequesterDetails({
         ) : null}
 
         {pending ? (
-          <p className="mt-4 text-xs font-bold text-crimson">
-            {t("match.respondBy", { time: formatCountdown(wait) })}
-          </p>
-        ) : null}
-
-        {pending ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onAccept}
-              className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-teal px-4 text-sm font-black uppercase tracking-wider text-white"
-            >
-              <Check className="size-4" aria-hidden />
-              {t("match.accept")}
-            </button>
-            <button
-              type="button"
-              onClick={onDecline}
-              className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-line bg-white px-4 text-sm font-black uppercase tracking-wider text-ink"
-            >
-              <X className="size-4" aria-hidden />
-              {t("match.decline")}
-            </button>
+          <div className="sticky bottom-0 z-10 -mx-6 mt-4 border-t border-line/80 bg-white/95 px-6 pb-1 pt-3 backdrop-blur-sm sm:-mx-7 sm:px-7">
+            <p className="text-xs font-bold text-crimson">
+              {t("match.respondBy", { time: formatCountdown(wait) })}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onAccept}
+                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-teal px-4 text-sm font-black uppercase tracking-wider text-white"
+              >
+                <Check className="size-4" aria-hidden />
+                {t("match.accept")}
+              </button>
+              <button
+                type="button"
+                onClick={onDecline}
+                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-line bg-white px-4 text-sm font-black uppercase tracking-wider text-ink"
+              >
+                <X className="size-4" aria-hidden />
+                {t("match.decline")}
+              </button>
+            </div>
+            <p className="mt-3 text-center text-xs font-semibold text-ink-muted">
+              {t("live.contactAfterMatch")}
+            </p>
           </div>
         ) : null}
 
@@ -190,10 +192,6 @@ export function AssignedRequesterDetails({
             </a>
             <WhatsAppConnectButton requestId={request.id} className="mt-2" />
           </>
-        ) : pending ? (
-          <p className="mt-3 text-center text-xs font-semibold text-ink-muted">
-            {t("live.contactAfterMatch")}
-          </p>
         ) : null}
 
         <p className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted">

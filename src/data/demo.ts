@@ -103,6 +103,38 @@ export const DEMO_HOSPITALS: Hospital[] = [
     lat: 28.5678,
     lng: 77.206,
   },
+  {
+    id: "h9",
+    name: "Brahm Shakti Hospital",
+    area: "Begampur",
+    city: "Delhi",
+    lat: 28.7476,
+    lng: 77.1164,
+  },
+  {
+    id: "h10",
+    name: "Bhagwan Mahavir Hospital",
+    area: "Rohini Sector 14",
+    city: "Delhi",
+    lat: 28.7208,
+    lng: 77.1169,
+  },
+  {
+    id: "h11",
+    name: "Jaipur Golden Hospital",
+    area: "Rohini Sector 3",
+    city: "Delhi",
+    lat: 28.7006,
+    lng: 77.1178,
+  },
+  {
+    id: "h12",
+    name: "Dr. Baba Saheb Ambedkar Hospital",
+    area: "Rohini Sector 6",
+    city: "Delhi",
+    lat: 28.7152,
+    lng: 77.1124,
+  },
 ];
 
 export const DEMO_LIVE_REQUESTS: BloodRequest[] = [];

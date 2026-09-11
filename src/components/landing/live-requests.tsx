@@ -20,6 +20,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage, type MessagePath } from "@/components/i18n/language-provider";
 import { AssignedDonorLine } from "@/components/request-help/assigned-donor";
 import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
+import { AssignedRequesterDetails } from "@/components/request-help/assigned-requester-details";
 import { ContactPhone } from "@/components/request-help/contact-phone";
 import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
@@ -31,6 +32,7 @@ import {
   canViewAssignedDonor,
   isAssignedDonor,
   isOwnDonor,
+  offerAssignmentToDonor,
   rankRequestsForDonor,
   respondToAssignment,
   waitForAnotherDonor,
@@ -716,7 +718,25 @@ export function LiveRequests({
               canOpen={Boolean(donor && !isOwnDonor(request, donor))}
               confirming={confirmingId === request.id}
               waiting={waitingId === request.id}
-              onOpen={() => setOpenRequest(request)}
+              onOpen={() => {
+                if (donor && !isOwnDonor(request, donor)) {
+                  const offered = offerAssignmentToDonor(request, donor);
+                  setRequests((prev) =>
+                    prev.map((item) =>
+                      item.id === offered.id
+                        ? {
+                            ...item,
+                            assignment: offered.assignment,
+                            status: offered.status,
+                          }
+                        : item,
+                    ),
+                  );
+                  setOpenRequest(offered);
+                  return;
+                }
+                setOpenRequest(request);
+              }}
               onAccepted={
                 user?.id && request.userId === user.id
                   ? () => {
@@ -780,21 +800,50 @@ export function LiveRequests({
         ) : null}
       </div>
       {donor && openRequest ? (
-        <RequestDetailModal
-          request={
-            sorted.find((item) => item.id === openRequest.id) ?? openRequest
-          }
-          donorId={donor.id}
-          onClose={() => setOpenRequest(null)}
-          onRespond={(action) => {
-            void respondToAssignment(
-              openRequest.id,
-              donor.id,
-              action,
-              openRequest.userId,
-            );
-          }}
-        />
+        isAssignedDonor(
+          sorted.find((item) => item.id === openRequest.id) ?? openRequest,
+          donor.id,
+        ) ? (
+          <AssignedRequesterDetails
+            request={
+              sorted.find((item) => item.id === openRequest.id) ?? openRequest
+            }
+            onClose={() => setOpenRequest(null)}
+            onAccept={() => {
+              void respondToAssignment(
+                openRequest.id,
+                donor.id,
+                "accept",
+                openRequest.userId,
+              ).then(() => fetchLiveRequests()).then(setRequests);
+            }}
+            onDecline={() => {
+              setOpenRequest(null);
+              void respondToAssignment(
+                openRequest.id,
+                donor.id,
+                "decline",
+                openRequest.userId,
+              ).then(() => fetchLiveRequests()).then(setRequests);
+            }}
+          />
+        ) : (
+          <RequestDetailModal
+            request={
+              sorted.find((item) => item.id === openRequest.id) ?? openRequest
+            }
+            donorId={donor.id}
+            onClose={() => setOpenRequest(null)}
+            onRespond={(action) => {
+              void respondToAssignment(
+                openRequest.id,
+                donor.id,
+                action,
+                openRequest.userId,
+              );
+            }}
+          />
+        )
       ) : null}
       {donorDetails?.assignment?.donorId ? (
         <AssignedDonorDetails

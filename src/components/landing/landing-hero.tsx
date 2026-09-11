@@ -300,6 +300,15 @@ export function LandingHero() {
           </div>
         </div>
 
+        <div className="animate-hero-reveal-delay-1 hidden w-full max-w-md justify-self-end lg:col-start-2 lg:row-start-1 lg:block lg:self-end">
+          <VoiceLaunchButton
+            className="w-full"
+            onClick={openVoice}
+            title={t("hero.voiceTitle")}
+            subtitle={t("hero.voiceSub")}
+          />
+        </div>
+
         <div className="animate-hero-reveal-delay-2 col-span-full mt-8 grid w-full grid-cols-1 items-stretch gap-5 sm:mt-10 lg:col-span-2 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-x-10">
           <div className="grid w-full max-w-md grid-cols-1 gap-5 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
             {ACTIONS.filter((action) => !(action.role === "ngo" && ngoName)).map((action) => (

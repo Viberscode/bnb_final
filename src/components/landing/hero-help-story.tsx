@@ -81,31 +81,33 @@ export function HeroHelpStory({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/10 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.55)] backdrop-blur-md",
+        "relative flex h-full w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/10 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.55)] backdrop-blur-md",
         className,
       )}
       aria-hidden
     >
       <div
         className={cn(
-          "p-5 transition-all duration-500 sm:p-6",
+          "flex min-h-0 flex-1 flex-col p-4 transition-all duration-500 sm:p-5",
           phase === "brand" && "pointer-events-none scale-95 opacity-0",
         )}
       >
-        <div className="mb-3 flex items-center justify-between text-[0.7rem] font-bold uppercase tracking-[0.16em] text-white/55">
-          <span>{t("hero.howItWorks")}</span>
-          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] normal-case tracking-normal text-white/80">
+        <div className="mb-2 flex shrink-0 items-center justify-between gap-2 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-white/55 sm:mb-3 sm:text-[0.7rem]">
+          <span className="truncate">{t("hero.howItWorks")}</span>
+          <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] normal-case tracking-normal text-white/80">
             {t("hero.flow")}
           </span>
         </div>
 
-        <svg
-          key={cycle}
-          viewBox="0 0 360 200"
-          className="story-scene h-auto w-full"
-          role="img"
-          aria-label="Patient gets help from a donor"
-        >
+        <div className="min-h-0 w-full flex-1">
+          <svg
+            key={cycle}
+            viewBox="0 0 360 200"
+            className="story-scene h-full w-full"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label="Patient gets help from a donor"
+          >
           <defs>
             <linearGradient id="storyDrop" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#ff6b7f" />
@@ -199,14 +201,15 @@ export function HeroHelpStory({ className }: { className?: string }) {
             <circle cx="200" cy="52" r="2.5" />
           </g>
         </svg>
+        </div>
 
-        <div className="mt-3 border-t border-white/10 pt-4">
-          <div className="mb-2 flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/55">
+        <div className="mt-2 shrink-0 border-t border-white/10 pt-3 sm:mt-3 sm:pt-4">
+          <div className="mb-1.5 flex items-center justify-between text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/55 sm:mb-2">
             <span>{t("hero.life")}</span>
             <span className="tabular-nums text-[#7dffa8]">{life}%</span>
           </div>
 
-          <div className="relative mb-2 h-9">
+          <div className="relative mb-1.5 h-7 sm:mb-2 sm:h-9">
             {dropKey > 0 && (
               <span key={dropKey} className="life-feed-drop absolute left-[14%] top-0" />
             )}
@@ -221,7 +224,7 @@ export function HeroHelpStory({ className }: { className?: string }) {
             ))}
           </div>
 
-          <div className="relative h-4 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15">
+          <div className="relative h-3.5 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15 sm:h-4">
             <span className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#ff4d6d]/35 to-transparent" />
             <div
               className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#9f1239] via-[#e11d48] to-[#7dffa8] transition-[width] duration-500 ease-out"

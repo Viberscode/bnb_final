@@ -648,7 +648,10 @@ export function LiveRequests({
                     {t("live.requestWord")}
                   </span>
                 </>
-              )}
+              )}{" "}
+              <span className="align-middle text-[0.55em] font-bold normal-case tracking-normal text-ink-muted sm:text-[0.5em]">
+                {t("live.past24h")}
+              </span>
             </span>
           </h2>
 

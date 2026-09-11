@@ -291,15 +291,17 @@ export function LandingHero() {
     >
       <HeroLifeBackdrop />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-20">
-        <div className="max-w-xl">
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-x-10 lg:gap-y-0 lg:py-20">
+        <div className="max-w-xl lg:col-start-1 lg:row-start-1">
           <BloodKitHeading id="hero-brand" />
 
           <div className="animate-hero-reveal-delay-1 relative z-20 mt-5 sm:mt-6">
             <LanguageSwitcher variant="hero" />
           </div>
+        </div>
 
-          <div className="animate-hero-reveal-delay-2 mt-8 grid w-full max-w-md grid-cols-1 gap-5 sm:mt-10 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
+        <div className="animate-hero-reveal-delay-2 col-span-full mt-8 grid w-full grid-cols-1 items-stretch gap-5 sm:mt-10 lg:col-span-2 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-x-10">
+          <div className="grid w-full max-w-md grid-cols-1 gap-5 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
             {ACTIONS.filter((action) => !(action.role === "ngo" && ngoName)).map((action) => (
               <button
                 key={action.role}
@@ -388,16 +390,12 @@ export function LandingHero() {
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="animate-hero-reveal-delay-2 hidden w-full max-w-md justify-self-end lg:block">
-          <VoiceLaunchButton
-            className="w-full"
-            onClick={openVoice}
-            title={t("hero.voiceTitle")}
-            subtitle={t("hero.voiceSub")}
-          />
-          <HeroHelpStory className="mt-6" />
+          <div className="relative hidden min-h-0 lg:block">
+            <div className="absolute inset-0">
+              <HeroHelpStory className="h-full max-w-none" />
+            </div>
+          </div>
         </div>
       </div>
 

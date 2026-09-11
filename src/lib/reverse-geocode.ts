@@ -117,8 +117,25 @@ export async function reverseGeocode(
   try {
     const primary = await fromBigDataCloud(lat, lng, locale);
     if (primary?.city && primary?.area) return primary;
+
     const fallback = await fromAppApi(lat, lng);
-    return fallback ?? primary;
+    if (fallback?.city) {
+      return {
+        city: fallback.city,
+        area: fallback.area || primary?.area || fallback.city,
+        label: fallback.label || primary?.label || fallback.city,
+      };
+    }
+
+    if (primary?.city || primary?.area) {
+      return {
+        city: primary.city || primary.area,
+        area: primary.area || primary.city,
+        label: primary.label,
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }

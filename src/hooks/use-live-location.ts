@@ -1,7 +1,10 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { distanceKm } from "@/lib/geo";
 
 export type LiveLocationStatus =
+  | "idle"
   | "loading"
   | "tracking"
   | "denied"
@@ -13,16 +16,19 @@ export interface LiveCoords {
   accuracy: number;
 }
 
-const GPS_OPTIONS: PositionOptions = {
+const QUICK_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  maximumAge: 60_000,
+  timeout: 8_000,
+};
+
+const PRECISE_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
-  maximumAge: 0,
+  maximumAge: 10_000,
   timeout: 20_000,
 };
 
-function shouldKeep(
-  prev: LiveCoords | null,
-  next: LiveCoords,
-): LiveCoords {
+function shouldKeep(prev: LiveCoords | null, next: LiveCoords): LiveCoords {
   if (!prev) return next;
   const movedM = distanceKm(prev.lat, prev.lng, next.lat, next.lng) * 1000;
   if (next.accuracy <= prev.accuracy) return next;
@@ -30,19 +36,32 @@ function shouldKeep(
   return prev;
 }
 
-/** Real-time device GPS via watchPosition (high accuracy). */
-export function useLiveLocation() {
+function toCoords(pos: GeolocationPosition): LiveCoords {
+  return {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    accuracy: pos.coords.accuracy,
+  };
+}
+
+function locateOnce(options: PositionOptions): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+/** Real-time device GPS via getCurrentPosition + watchPosition. */
+export function useLiveLocation(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const [coords, setCoords] = useState<LiveCoords | null>(null);
-  const [status, setStatus] = useState<LiveLocationStatus>("loading");
+  const [status, setStatus] = useState<LiveLocationStatus>(
+    enabled ? "loading" : "idle",
+  );
   const [watchKey, setWatchKey] = useState(0);
   const latest = useRef<LiveCoords | null>(null);
 
   const applyPosition = useCallback((pos: GeolocationPosition) => {
-    const next = {
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
-    };
+    const next = toCoords(pos);
     const kept = shouldKeep(latest.current, next);
     latest.current = kept;
     setCoords(kept);
@@ -50,28 +69,68 @@ export function useLiveLocation() {
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
+    if (!enabled) {
+      setStatus("idle");
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
       setStatus("unavailable");
       return;
     }
 
+    let cancelled = false;
+    let watchId: number | null = null;
     latest.current = null;
     setStatus("loading");
 
-    navigator.geolocation.getCurrentPosition(applyPosition, () => undefined, GPS_OPTIONS);
+    const fail = (err?: GeolocationPositionError) => {
+      if (cancelled || latest.current) return;
+      if (err && err.code === err.PERMISSION_DENIED) setStatus("denied");
+      else setStatus("unavailable");
+    };
 
-    const watchId = navigator.geolocation.watchPosition(
-      applyPosition,
-      (err) => {
-        if (latest.current) return;
-        if (err.code === err.PERMISSION_DENIED) setStatus("denied");
-        else setStatus("unavailable");
-      },
-      GPS_OPTIONS,
-    );
+    void (async () => {
+      try {
+        const quick = await locateOnce(QUICK_OPTIONS);
+        if (cancelled) return;
+        applyPosition(quick);
+      } catch {
+        try {
+          const precise = await locateOnce(PRECISE_OPTIONS);
+          if (cancelled) return;
+          applyPosition(precise);
+        } catch (err) {
+          fail(err as GeolocationPositionError);
+        }
+      }
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [applyPosition, watchKey]);
+      if (cancelled) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!cancelled) applyPosition(pos);
+        },
+        (err) => {
+          if (latest.current) return;
+          fail(err);
+        },
+        PRECISE_OPTIONS,
+      );
+    })();
+
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled && !latest.current) {
+        setStatus((prev) => (prev === "loading" ? "unavailable" : prev));
+      }
+    }, 22_000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(watchdog);
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [applyPosition, enabled, watchKey]);
 
   function retry() {
     latest.current = null;

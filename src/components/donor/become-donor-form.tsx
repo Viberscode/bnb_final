@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
   Droplets,
@@ -116,7 +116,12 @@ function StepPanel({
 export function BecomeDonorForm() {
   const { t, locale } = useLanguage();
   const { user, status } = useAuth();
-  const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
+  const [followLive, setFollowLive] = useState(true);
+  const {
+    coords,
+    status: locStatus,
+    retry: retryLocation,
+  } = useLiveLocation({ enabled: followLive });
   const [fullName, setFullName] = useState("");
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | null>(null);
   const [phone, setPhone] = useState("");
@@ -126,7 +131,6 @@ export function BecomeDonorForm() {
   const [area, setArea] = useState("");
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
-  const [followLive, setFollowLive] = useState(true);
   const [readingAddress, setReadingAddress] = useState(false);
   const [available, setAvailable] = useState(true);
   const [lastDonation, setLastDonation] = useState("");
@@ -136,6 +140,8 @@ export function BecomeDonorForm() {
   const [error, setError] = useState<string | null>(null);
   const [isEdit, setIsEdit] = useState(false);
   const [kycVerified, setKycVerified] = useState(false);
+  const userChoseLive = useRef(false);
+  const lastGeocoded = useRef<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -158,15 +164,19 @@ export function BecomeDonorForm() {
       setBloodGroup(existing.bloodGroup);
       setPhone(indianMobileDigits(existing.phone));
       setEmail(existing.email ?? "");
-      setCity(existing.city);
-      setArea(existing.area);
-      setLat(existing.lat);
-      setLng(existing.lng);
+      if (!userChoseLive.current) {
+        setCity(existing.city);
+        setArea(existing.area);
+        setLat(existing.lat);
+        setLng(existing.lng);
+        if (existing.city && existing.area && !existing.lat) {
+          setFollowLive(false);
+        }
+      }
       setAvailable(existing.available);
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
       setNotes(existing.notes ?? "");
-      if (existing.city && existing.area) setFollowLive(false);
     })();
     return () => {
       active = false;
@@ -175,21 +185,39 @@ export function BecomeDonorForm() {
 
   useEffect(() => {
     if (!followLive || !coords) return;
-    let active = true;
+
+    const key = `${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
     setLat(coords.lat);
     setLng(coords.lng);
+    persistDonorCoords(coords.lat, coords.lng);
+
+    if (lastGeocoded.current === key) return;
+    lastGeocoded.current = key;
+
+    let active = true;
     setReadingAddress(true);
-    void reverseGeocode(coords.lat, coords.lng, locale).then((place) => {
-      if (!active) return;
-      setReadingAddress(false);
-      if (!place) return;
-      setCity(place.city);
-      setArea(place.area);
-    });
+    void reverseGeocode(coords.lat, coords.lng, locale)
+      .then((place) => {
+        if (!active || !followLive) return;
+        if (!place) return;
+        if (place.city) setCity(place.city);
+        if (place.area) setArea(place.area);
+      })
+      .finally(() => {
+        if (active) setReadingAddress(false);
+      });
+
     return () => {
       active = false;
     };
   }, [coords?.lat, coords?.lng, followLive, locale]);
+
+  function enableLiveLocation() {
+    userChoseLive.current = true;
+    lastGeocoded.current = null;
+    setFollowLive(true);
+    retryLocation();
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -467,10 +495,7 @@ export function BecomeDonorForm() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setFollowLive(true);
-              retryLocation();
-            }}
+            onClick={enableLiveLocation}
             className={cn(
               "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold transition",
               followLive
@@ -512,11 +537,16 @@ export function BecomeDonorForm() {
           {followLive && (locStatus === "denied" || locStatus === "unavailable") ? (
             <button
               type="button"
-              onClick={retryLocation}
+              onClick={enableLiveLocation}
               className="text-xs font-bold text-crimson underline-offset-2 hover:underline"
             >
               {t("donor.errLocation")}
             </button>
+          ) : null}
+          {followLive && locStatus === "tracking" && city && area ? (
+            <span className="text-xs font-semibold text-teal-deep">
+              {area}, {city}
+            </span>
           ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

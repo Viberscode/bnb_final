@@ -2,6 +2,7 @@ import type { BloodGroup, DonorProfile } from "@/types";
 import { createdAfterReset } from "@/lib/data-reset";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { computeTrustScore } from "@/lib/trust-score";
 
 export const DONOR_PROFILE_EVENT = "bloodkit:donor-profile";
 
@@ -149,6 +150,24 @@ export async function saveDonorProfile(
     ? existing!.joined_at!
     : new Date().toISOString();
 
+  const donationsCompleted =
+    input.donationsCompleted ?? existing?.donations_completed ?? 0;
+  const livesHelped = input.livesHelped ?? existing?.lives_helped ?? 0;
+  const avgResponseMinutes =
+    input.avgResponseMinutes ?? existing?.avg_response_minutes ?? null;
+  const trustScore = computeTrustScore({
+    donationsCompleted,
+    livesHelped,
+    avgResponseMinutes,
+    available: input.available,
+    joinedAt,
+    phone: input.phone,
+    city: input.city,
+    area: input.area,
+    age: input.age,
+    telegramChatId: undefined,
+  });
+
   const payload = {
     id: user.id,
     full_name: input.fullName.trim(),
@@ -161,11 +180,10 @@ export async function saveDonorProfile(
     last_donation: input.lastDonation || null,
     age: input.age ?? null,
     notes: input.notes?.trim() || null,
-    donations_completed: input.donationsCompleted ?? existing?.donations_completed ?? 0,
-    trust_score: input.trustScore ?? existing?.trust_score ?? 72,
-    lives_helped: input.livesHelped ?? existing?.lives_helped ?? 0,
-    avg_response_minutes:
-      input.avgResponseMinutes ?? existing?.avg_response_minutes ?? 14,
+    donations_completed: donationsCompleted,
+    trust_score: trustScore,
+    lives_helped: livesHelped,
+    avg_response_minutes: avgResponseMinutes ?? 0,
     joined_at: joinedAt,
     updated_at: new Date().toISOString(),
   };

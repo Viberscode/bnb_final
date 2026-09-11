@@ -12,7 +12,11 @@ import {
   subscribeDonorProfile,
   updateDonorAvailability,
 } from "@/lib/donor-profile";
-import { fetchDonorActivity } from "@/lib/donor-activity";
+import {
+  emptyDonorActivity,
+  fetchDonorActivity,
+  syncDonorTrustStats,
+} from "@/lib/donor-activity";
 import { subscribeLiveRequests } from "@/lib/live-requests";
 import type { DonorActivity } from "@/lib/donor-activity";
 import type { DonorProfile } from "@/types";
@@ -21,13 +25,7 @@ export default function DonorProfilePage() {
   const { user, status } = useAuth();
   const { t } = useLanguage();
   const [profile, setProfile] = useState<DonorProfile | null>(null);
-  const [activity, setActivity] = useState<DonorActivity>({
-    verifiedDonations: 0,
-    criticalCompleted: 0,
-    emergencyCompleted: 0,
-    rapidCompleted: 0,
-    maxInOneCity: 0,
-  });
+  const [activity, setActivity] = useState<DonorActivity>(emptyDonorActivity());
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -36,6 +34,35 @@ export default function DonorProfilePage() {
     const refresh = async () => {
       const nextProfile = await fetchDonorProfile(user?.id);
       const nextActivity = await fetchDonorActivity(user?.id, nextProfile);
+      if (user?.id && nextProfile) {
+        const synced = await syncDonorTrustStats(user.id, {
+          ...nextProfile,
+          donationsCompleted: Math.max(
+            nextProfile.donationsCompleted,
+            nextActivity.verifiedDonations,
+          ),
+          livesHelped: Math.max(
+            nextProfile.livesHelped,
+            nextActivity.verifiedDonations,
+          ),
+          avgResponseMinutes:
+            nextActivity.avgResponseMinutes ?? nextProfile.avgResponseMinutes,
+        });
+        if (!active) return;
+        if (synced) {
+          setProfile({
+            ...nextProfile,
+            trustScore: synced.trust,
+            donationsCompleted: synced.donations,
+            livesHelped: synced.lives,
+            avgResponseMinutes:
+              synced.avgResponseMinutes ?? nextProfile.avgResponseMinutes,
+          });
+          setActivity(synced.activity);
+          setReady(true);
+          return;
+        }
+      }
       if (!active) return;
       setProfile(nextProfile);
       setActivity(nextActivity);

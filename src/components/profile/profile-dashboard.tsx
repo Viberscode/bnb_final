@@ -14,6 +14,7 @@ import {
 import { useLanguage } from "@/components/i18n/language-provider";
 import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { MedalCollection } from "@/components/achievements/medal-collection";
+import { trustScoreFor } from "@/lib/trust-score";
 import { cn } from "@/lib/utils";
 import type { DonorActivity } from "@/lib/donor-activity";
 import type { DonorProfile } from "@/types";
@@ -64,6 +65,14 @@ export function ProfileDashboard({
   onToggle: (next: boolean) => void;
 }) {
   const { t, locale } = useLanguage();
+  const trustScore = trustScoreFor(profile, activity);
+  const donations = Math.max(
+    profile.donationsCompleted,
+    activity.verifiedDonations,
+  );
+  const livesHelped = Math.max(profile.livesHelped, activity.verifiedDonations);
+  const avgResponse =
+    activity.avgResponseMinutes ?? profile.avgResponseMinutes;
   const joined = new Date(profile.joinedAt).toLocaleDateString(
     locale === "hi" ? "hi-IN" : "en-IN",
     {
@@ -132,25 +141,25 @@ export function ProfileDashboard({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t("profile.trust")}
-          value={`${profile.trustScore}`}
+          value={`${trustScore}`}
           icon={ShieldCheck}
           tone="teal"
         />
         <StatCard
           label={t("profile.donations")}
-          value={`${profile.donationsCompleted}`}
+          value={`${donations}`}
           icon={Droplets}
           tone="crimson"
         />
         <StatCard
           label={t("profile.livesHelped")}
-          value={`${profile.livesHelped}`}
+          value={`${livesHelped}`}
           icon={HeartHandshake}
           tone="amber"
         />
         <StatCard
           label={t("profile.avgResponse")}
-          value={`${profile.avgResponseMinutes}m`}
+          value={avgResponse && avgResponse > 0 ? `${avgResponse}m` : "—"}
           icon={Clock3}
           tone="slate"
         />

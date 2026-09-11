@@ -123,7 +123,8 @@ export const ALL_MEDALS: MedalDefinition[] = [
 
 export function evaluateMedals(activity: DonorActivity): MedalProgress[] {
   return ALL_MEDALS.map((medal) => {
-    const current = activity[medal.metric] ?? 0;
+    const raw = activity[medal.metric];
+    const current = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
     return {
       ...medal,
       current,

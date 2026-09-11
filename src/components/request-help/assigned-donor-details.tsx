@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { formatDistance } from "@/lib/geo";
 import { canShareContactDetails } from "@/lib/donor-assignment";
 import { fetchDonorProfile } from "@/lib/donor-profile";
+import { trustScoreFor } from "@/lib/trust-score";
 import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { ContactPhone } from "@/components/request-help/contact-phone";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
@@ -121,7 +122,7 @@ export function AssignedDonorDetails({
             [t("profile.age"), profile?.age ? String(profile.age) : "—"],
             [t("profile.donations"), String(profile?.donationsCompleted ?? assignment.donationsCompleted)],
             [t("profile.livesHelped"), String(profile?.livesHelped ?? "—")],
-            [t("profile.trust"), profile ? String(profile.trustScore) : "—"],
+            [t("profile.trust"), profile ? String(trustScoreFor(profile)) : "—"],
             [t("profile.lastDonation"), lastDonation],
           ].map(([label, value]) => (
             <div

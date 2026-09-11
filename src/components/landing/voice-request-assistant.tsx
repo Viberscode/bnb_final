@@ -338,10 +338,10 @@ export function VoiceRequestAssistant({
       setField(next);
       setPrompt(text);
       setStatus("speaking");
-      await io.speak(text, lang);
-      if (still()) {
-        await new Promise((resolve) => window.setTimeout(resolve, 280));
-      }
+      // Speak and arm the mic in parallel so listening starts the moment TTS ends.
+      const speakPromise = io.speak(text, lang);
+      void io.warmMic();
+      await speakPromise;
     }
 
     async function run() {
@@ -361,19 +361,20 @@ export function VoiceRequestAssistant({
         return;
       }
 
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          stream.getTracks().forEach((track) => track.stop());
-        });
-      } catch {
+      // Mic + existing-request check in parallel — don't serialize startup.
+      const [micOk, existing] = await Promise.all([
+        io.warmMic(),
+        fetchActiveRequestForUser(user?.id),
+      ]);
+      if (!still()) return;
+
+      if (!micOk) {
         setStatus("error");
         setError(say(localeRef.current, "voiceAssist.needMic"));
         await io.speak(say(localeRef.current, "voiceAssist.speakNeedMic"), localeRef.current);
         return;
       }
 
-      const existing = await fetchActiveRequestForUser(user?.id);
-      if (!still()) return;
       if (existing) {
         setStatus("blocked");
         setPrompt(say(localeRef.current, "voiceAssist.alreadyOpen"));
@@ -381,19 +382,7 @@ export function VoiceRequestAssistant({
         return;
       }
 
-      await io.speak(say(localeRef.current, "voiceAssist.speakWelcome"), localeRef.current);
-      if (!still()) return;
-
-      const locWait = Date.now() + 7000;
-      while (
-        still() &&
-        !coordsRef.current &&
-        locStatusRef.current === "loading" &&
-        Date.now() < locWait
-      ) {
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-      }
-
+      // Skip long welcome + GPS wait — jump straight into the first question.
       let current: VoiceDraft = {
         ...EMPTY_DRAFT,
         contactName: "",
@@ -409,9 +398,17 @@ export function VoiceRequestAssistant({
 
         setStatus("listening");
         setCaption("");
-        const heard = await io.listen(localeRef.current, (text) => {
-          if (still()) setCaption(text);
-        });
+        const heard = await io.listen(
+          localeRef.current,
+          (text) => {
+            if (still()) setCaption(text);
+          },
+          next === "phone"
+            ? { minWords: 12, silenceMs: 1400 }
+            : next === "confirm"
+              ? { minWords: 1, silenceMs: 700 }
+              : { minWords: 3, silenceMs: 850 },
+        );
         if (!still()) return;
 
         if (!heard.trim()) {
@@ -443,10 +440,6 @@ export function VoiceRequestAssistant({
           current = { ...EMPTY_DRAFT, contactName: "" };
           hospitalTries = 0;
           setDraft(current);
-          await io.speak(
-            say(localeRef.current, "voiceAssist.speakWelcome"),
-            localeRef.current,
-          );
           continue;
         }
         if (result.submit) {
@@ -479,8 +472,11 @@ export function VoiceRequestAssistant({
 
       setStatus("submitting");
       setPrompt(say(localeRef.current, "voiceAssist.goingLive"));
-      await io.speak(say(localeRef.current, "voiceAssist.speakPublishing"), localeRef.current);
-      if (!still()) return;
+      // Publish immediately; speak in parallel so we don't block on TTS.
+      const speakPromise = io.speak(
+        say(localeRef.current, "voiceAssist.speakPublishing"),
+        localeRef.current,
+      );
 
       try {
         const units = current.units ?? 1;
@@ -511,10 +507,11 @@ export function VoiceRequestAssistant({
           : request;
         void notifyDonorsRequestIsLive(owned.id);
         await startAssignmentForRequest(owned, donors);
+        await speakPromise;
         if (!still()) return;
         setStatus("done");
         setPrompt(say(localeRef.current, "voiceAssist.liveBody"));
-        await io.speak(say(localeRef.current, "voiceAssist.speakLive"), localeRef.current);
+        void io.speak(say(localeRef.current, "voiceAssist.speakLive"), localeRef.current);
       } catch (err) {
         setStatus("error");
         setError(
@@ -636,7 +633,7 @@ export function VoiceRequestAssistant({
               type="button"
               onClick={() => {
                 if (status === "speaking") {
-                  window.speechSynthesis?.cancel();
+                  ioRef.current.stopSpeaking();
                 } else if (status === "listening") {
                   ioRef.current.stopListening();
                 }

@@ -76,13 +76,13 @@ export function computeTrustScore(input: TrustScoreInput): number {
     }
   }
 
-  // Faster average response → higher trust
+  // Faster average response → higher trust (offer window is ~2.5 minutes)
   const avg = input.avgResponseMinutes;
-  if (avg != null && Number.isFinite(avg) && avg > 0) {
-    if (avg <= 8) score += 6;
-    else if (avg <= 15) score += 4;
-    else if (avg <= 30) score += 2;
-    else if (avg <= 60) score += 1;
+  if (avg != null && Number.isFinite(avg) && avg > 0 && avg <= 30) {
+    if (avg <= 1) score += 6;
+    else if (avg <= 2) score += 4;
+    else if (avg <= 5) score += 2;
+    else score += 1;
   }
 
   score -= Math.min(40, penalty);

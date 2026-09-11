@@ -20,19 +20,20 @@ function pickVoice(lang: Locale) {
   return voices.find((voice) => voice.lang.toLowerCase().startsWith(prefix)) ?? null;
 }
 
-function waitForVoices() {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    return Promise.resolve();
-  }
-  if (window.speechSynthesis.getVoices().length > 0) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const done = () => {
-      window.speechSynthesis.removeEventListener("voiceschanged", done);
-      resolve();
-    };
-    window.speechSynthesis.addEventListener("voiceschanged", done);
-    window.setTimeout(done, 800);
+/** Warm voices in the background — never block the user. */
+function warmVoices() {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.getVoices();
+  const onChange = () => {
+    window.speechSynthesis.getVoices();
+  };
+  window.speechSynthesis.addEventListener("voiceschanged", onChange, {
+    once: true,
   });
+}
+
+if (typeof window !== "undefined") {
+  warmVoices();
 }
 
 export type CaptionHandler = (text: string, interim: boolean) => void;
@@ -41,6 +42,8 @@ export function createVoiceIo() {
   let aborted = false;
   let recognition: SpeechRecognition | null = null;
   let activeUtterance: SpeechSynthesisUtterance | null = null;
+  let settleSpeak: (() => void) | null = null;
+  let micWarm: Promise<boolean> | null = null;
 
   function stopListening() {
     try {
@@ -50,71 +53,121 @@ export function createVoiceIo() {
     }
   }
 
+  function stopSpeaking() {
+    settleSpeak?.();
+    settleSpeak = null;
+    activeUtterance = null;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+  }
+
   function stop() {
     aborted = true;
-    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    stopSpeaking();
     try {
       recognition?.abort();
     } catch {
       /* ignore */
     }
     recognition = null;
-    activeUtterance = null;
   }
 
   function reset() {
     aborted = false;
   }
 
+  /** Request mic permission early so the first listen is instant. */
+  function warmMic() {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      return Promise.resolve(false);
+    }
+    if (!micWarm) {
+      micWarm = navigator.mediaDevices
+        .getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        })
+        .then((stream) => {
+          stream.getTracks().forEach((track) => track.stop());
+          return true;
+        })
+        .catch(() => false);
+    }
+    return micWarm;
+  }
+
   async function speak(text: string, lang: Locale) {
     if (aborted || !text.trim()) return;
     if (typeof window === "undefined" || !window.speechSynthesis) return;
 
-    await waitForVoices();
-    if (aborted) return;
-
-    window.speechSynthesis.cancel();
-    await new Promise((resolve) => window.setTimeout(resolve, 60));
-    if (aborted) return;
+    warmVoices();
+    stopSpeaking();
+    stopListening();
 
     await new Promise<void>((resolve) => {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
-      utterance.rate = lang === "hi" ? 0.92 : 0.96;
+      utterance.rate = lang === "hi" ? 1.05 : 1.08;
       utterance.pitch = 1;
       const voice = pickVoice(lang);
       if (voice) utterance.voice = voice;
       activeUtterance = utterance;
-      utterance.onend = () => {
+
+      const done = () => {
         if (activeUtterance === utterance) activeUtterance = null;
+        if (settleSpeak === done) settleSpeak = null;
         resolve();
       };
-      utterance.onerror = () => {
-        if (activeUtterance === utterance) activeUtterance = null;
-        resolve();
-      };
-      window.speechSynthesis.speak(utterance);
+      settleSpeak = done;
+      utterance.onend = done;
+      utterance.onerror = done;
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        done();
+      }
     });
   }
 
-  async function listen(lang: Locale, onCaption: CaptionHandler): Promise<string> {
+  async function listen(
+    lang: Locale,
+    onCaption: CaptionHandler,
+    options?: { minWords?: number; silenceMs?: number },
+  ): Promise<string> {
     const Ctor = SpeechRec();
     if (!Ctor || aborted) return "";
+
+    stopSpeaking();
+    await warmMic();
+
+    const minWords = options?.minWords ?? 4;
+    const silenceMs = options?.silenceMs ?? 900;
 
     return new Promise((resolve) => {
       let settled = false;
       let finals = "";
-      let idleRestarts = 0;
+      let interim = "";
+      let silenceTimer: number | null = null;
       const rec = new Ctor();
       recognition = rec;
       rec.lang = lang === "hi" ? "hi-IN" : "en-IN";
-      rec.continuous = true;
+      // One-shot recognition finalizes much faster than continuous mode.
+      rec.continuous = false;
       rec.interimResults = true;
-      rec.maxAlternatives = 3;
+      rec.maxAlternatives = 1;
+
+      const clearSilence = () => {
+        if (silenceTimer != null) {
+          window.clearTimeout(silenceTimer);
+          silenceTimer = null;
+        }
+      };
 
       const finish = (value: string) => {
         if (settled) return;
         settled = true;
+        clearSilence();
         window.clearTimeout(limit);
         try {
           rec.stop();
@@ -125,11 +178,20 @@ export function createVoiceIo() {
         resolve(value.trim());
       };
 
-      const limit = window.setTimeout(() => finish(finals), 18000);
+      const bumpSilence = () => {
+        clearSilence();
+        const heard = `${finals} ${interim}`.trim();
+        if (!heard) return;
+        silenceTimer = window.setTimeout(() => {
+          finish(finals || interim);
+        }, silenceMs);
+      };
+
+      const limit = window.setTimeout(() => finish(finals || interim), 10_000);
 
       rec.onresult = (event) => {
         if (aborted) return finish("");
-        let interim = "";
+        interim = "";
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
           const result = event.results[i];
           const alt = result[0]?.transcript ?? "";
@@ -141,33 +203,22 @@ export function createVoiceIo() {
           }
         }
         if (interim) onCaption(`${finals} ${interim}`.trim(), true);
-        if (finals.split(" ").length >= 12) finish(finals);
+        bumpSilence();
+        if (finals.split(/\s+/).filter(Boolean).length >= minWords) {
+          finish(finals);
+        }
       };
 
       rec.onerror = (event) => {
-        if (event.error === "no-speech" || event.error === "aborted") return;
-        finish(finals);
+        if (event.error === "no-speech" || event.error === "aborted") {
+          finish(finals || interim);
+          return;
+        }
+        finish(finals || interim);
       };
 
       rec.onend = () => {
-        if (settled || aborted) {
-          finish(finals);
-          return;
-        }
-        if (finals.trim()) {
-          finish(finals);
-          return;
-        }
-        idleRestarts += 1;
-        if (idleRestarts > 4) {
-          finish("");
-          return;
-        }
-        try {
-          rec.start();
-        } catch {
-          finish("");
-        }
+        finish(finals || interim);
       };
 
       try {
@@ -178,5 +229,13 @@ export function createVoiceIo() {
     });
   }
 
-  return { speak, listen, stop, stopListening, reset };
+  return {
+    speak,
+    listen,
+    stop,
+    stopListening,
+    stopSpeaking,
+    reset,
+    warmMic,
+  };
 }

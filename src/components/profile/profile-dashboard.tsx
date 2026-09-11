@@ -17,6 +17,7 @@ import { MedalCollection } from "@/components/achievements/medal-collection";
 import { trustScoreFor } from "@/lib/trust-score";
 import { cn } from "@/lib/utils";
 import type { DonorActivity } from "@/lib/donor-activity";
+import { formatAvgResponse } from "@/lib/donor-activity";
 import type { DonorProfile } from "@/types";
 
 function StatCard({
@@ -159,7 +160,7 @@ export function ProfileDashboard({
         />
         <StatCard
           label={t("profile.avgResponse")}
-          value={avgResponse && avgResponse > 0 ? `${avgResponse}m` : "—"}
+          value={formatAvgResponse(avgResponse)}
           icon={Clock3}
           tone="slate"
         />

@@ -14,7 +14,6 @@ import type { BloodRequest } from "@/types";
 export function MyRequestCard({
   request,
   onWatchSearch,
-  onViewDonor,
   onConfirmSolved,
   onWaitMore,
   confirming,
@@ -87,9 +86,8 @@ export function MyRequestCard({
             assignment={request.assignment}
             viewer="requester"
             requestId={request.id}
-            onViewDonor={onViewDonor}
           />
-          {onWatchSearch && request.assignment?.status !== "accepted" ? (
+          {onWatchSearch ? (
             <button
               type="button"
               onClick={onWatchSearch}

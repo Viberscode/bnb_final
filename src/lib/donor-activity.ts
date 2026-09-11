@@ -4,6 +4,9 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { DONOR_PROFILE_EVENT } from "@/lib/donor-profile";
 import { computeTrustScore, trustInputFromProfile } from "@/lib/trust-score";
 
+/** Offer window is ~2.5m — anything larger is not a real donor response. */
+const MAX_VALID_RESPONSE_MINUTES = 30;
+
 export type DonorActivity = {
   verifiedDonations: number;
   criticalCompleted: number;
@@ -26,6 +29,7 @@ type RequestSnap = {
 type ActivityRow = {
   status: string;
   assigned_at: string | null;
+  updated_at?: string | null;
   blood_requests: RequestSnap | RequestSnap[] | null;
 };
 
@@ -42,6 +46,21 @@ function cityKey(area?: string | null, hospital?: string | null) {
   return (hospital ?? "").trim().toLowerCase() || "unknown";
 }
 
+function sanitizeResponseMinutes(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  if (value > MAX_VALID_RESPONSE_MINUTES) return null;
+  return Math.round(value * 10) / 10;
+}
+
+/** Display helper: `45s`, `3m`, or `—`. */
+export function formatAvgResponse(minutes: number | null | undefined): string {
+  const clean = sanitizeResponseMinutes(minutes);
+  if (clean == null) return "—";
+  if (clean < 1) return `${Math.max(1, Math.round(clean * 60))}s`;
+  if (Number.isInteger(clean)) return `${clean}m`;
+  return `${clean.toFixed(1)}m`;
+}
+
 export function emptyDonorActivity(
   profile?: DonorProfile | null,
 ): DonorActivity {
@@ -52,7 +71,7 @@ export function emptyDonorActivity(
     rapidCompleted: 0,
     maxInOneCity: 0,
     acceptedAssignments: 0,
-    avgResponseMinutes: profile?.avgResponseMinutes ?? null,
+    avgResponseMinutes: sanitizeResponseMinutes(profile?.avgResponseMinutes),
   };
 }
 
@@ -69,7 +88,7 @@ export async function fetchDonorActivity(
   const { data, error } = await supabase
     .from("request_assignments")
     .select(
-      "status, assigned_at, blood_requests(status, urgency, hospital_area, hospital_name, created_at, patients_count)",
+      "status, assigned_at, updated_at, blood_requests(status, urgency, hospital_area, hospital_name, created_at, patients_count)",
     )
     .eq("donor_id", donorId)
     .eq("status", "accepted");
@@ -93,30 +112,30 @@ export async function fetchDonorActivity(
     if (request.urgency === "critical" || request.urgency === "urgent") {
       emergencyCompleted += 1;
     }
-    const assignedAt = row.assigned_at
-      ? new Date(row.assigned_at).getTime()
-      : NaN;
-    const createdAt = new Date(request.created_at).getTime();
-    if (Number.isFinite(assignedAt) && Number.isFinite(createdAt) && assignedAt >= createdAt) {
-      const mins = (assignedAt - createdAt) / 60_000;
-      responseSamples.push(mins);
-      if (mins <= 60) rapidCompleted += 1;
-    }
     const city = cityKey(request.hospital_area, request.hospital_name);
     cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
   }
 
-  // Also sample response speed from accepts that are not completed yet
+  // Donor response = time from offer (assigned_at) to accept (updated_at).
   for (const row of rows) {
-    const request = requestFromRow(row);
-    if (!request || request.status === "completed") continue;
-    const assignedAt = row.assigned_at
+    const offeredAt = row.assigned_at
       ? new Date(row.assigned_at).getTime()
       : NaN;
-    const createdAt = new Date(request.created_at).getTime();
-    if (Number.isFinite(assignedAt) && Number.isFinite(createdAt) && assignedAt >= createdAt) {
-      responseSamples.push((assignedAt - createdAt) / 60_000);
+    const acceptedAt = row.updated_at
+      ? new Date(row.updated_at).getTime()
+      : NaN;
+    if (
+      !Number.isFinite(offeredAt) ||
+      !Number.isFinite(acceptedAt) ||
+      acceptedAt < offeredAt
+    ) {
+      continue;
     }
+    const mins = (acceptedAt - offeredAt) / 60_000;
+    const clean = sanitizeResponseMinutes(mins);
+    if (clean == null) continue;
+    responseSamples.push(clean);
+    if (clean <= 5) rapidCompleted += 1;
   }
 
   let maxInOneCity = 0;
@@ -125,13 +144,10 @@ export async function fetchDonorActivity(
   }
 
   const avgResponseMinutes = responseSamples.length
-    ? Math.max(
-        1,
-        Math.round(
-          responseSamples.reduce((sum, n) => sum + n, 0) / responseSamples.length,
-        ),
+    ? sanitizeResponseMinutes(
+        responseSamples.reduce((sum, n) => sum + n, 0) / responseSamples.length,
       )
-    : profile?.avgResponseMinutes ?? null;
+    : sanitizeResponseMinutes(profile?.avgResponseMinutes);
 
   return {
     verifiedDonations: Math.max(
@@ -158,6 +174,44 @@ function readNoShowPenalty(donorId: string): number {
   }
 }
 
+/** Rolling average after a donor accepts an offer. */
+export async function recordDonorResponseSample(
+  donorId: string,
+  responseMinutes: number,
+) {
+  const clean = sanitizeResponseMinutes(responseMinutes);
+  if (clean == null) return;
+
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return;
+
+  const { data } = await supabase
+    .from("donor_profiles")
+    .select("avg_response_minutes")
+    .eq("id", donorId)
+    .maybeSingle();
+  if (!data) return;
+
+  const previous = sanitizeResponseMinutes(
+    Number((data as { avg_response_minutes?: number }).avg_response_minutes ?? 0) ||
+      null,
+  );
+  const next =
+    previous == null ? clean : Math.round(((previous * 2 + clean) / 3) * 10) / 10;
+
+  await supabase
+    .from("donor_profiles")
+    .update({
+      avg_response_minutes: next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", donorId);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DONOR_PROFILE_EVENT));
+  }
+}
+
 export async function syncDonorTrustStats(
   donorId: string,
   profile?: DonorProfile | null,
@@ -175,7 +229,8 @@ export async function syncDonorTrustStats(
   const mapped: DonorProfile = profile ?? {
     id: donorId,
     fullName: String((data as { full_name?: string }).full_name ?? ""),
-    bloodGroup: ((data as { blood_group?: string }).blood_group ?? "O+") as DonorProfile["bloodGroup"],
+    bloodGroup: ((data as { blood_group?: string }).blood_group ??
+      "O+") as DonorProfile["bloodGroup"],
     phone: String((data as { phone?: string }).phone ?? ""),
     city: String((data as { city?: string }).city ?? ""),
     area: String((data as { area?: string }).area ?? ""),
@@ -201,26 +256,27 @@ export async function syncDonorTrustStats(
   const donations = activity.verifiedDonations;
   const lives = Math.max(mapped.livesHelped, donations);
   const avg =
-    activity.avgResponseMinutes ?? mapped.avgResponseMinutes ?? null;
+    activity.avgResponseMinutes ??
+    sanitizeResponseMinutes(mapped.avgResponseMinutes);
   const trust = computeTrustScore(
     trustInputFromProfile(
       {
         ...mapped,
         donationsCompleted: donations,
         livesHelped: lives,
-        avgResponseMinutes: avg ?? mapped.avgResponseMinutes,
+        avgResponseMinutes: avg ?? 0,
       },
       activity,
       { noShowPenalty: readNoShowPenalty(donorId) },
     ),
   );
 
-  const nextAvg = avg ?? mapped.avgResponseMinutes;
+  const nextAvg = avg;
   const unchanged =
     mapped.trustScore === trust &&
     mapped.donationsCompleted === donations &&
     mapped.livesHelped === lives &&
-    mapped.avgResponseMinutes === nextAvg;
+    sanitizeResponseMinutes(mapped.avgResponseMinutes) === nextAvg;
 
   if (!unchanged) {
     await supabase
@@ -228,7 +284,7 @@ export async function syncDonorTrustStats(
       .update({
         donations_completed: donations,
         lives_helped: lives,
-        avg_response_minutes: nextAvg,
+        avg_response_minutes: nextAvg ?? 0,
         trust_score: trust,
         updated_at: new Date().toISOString(),
       })

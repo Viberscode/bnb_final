@@ -1,6 +1,9 @@
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { donorMatchesRequest } from "@/lib/blood-compatibility";
-import { recordDonorNoShow } from "@/lib/donor-activity";
+import {
+  recordDonorNoShow,
+  recordDonorResponseSample,
+} from "@/lib/donor-activity";
 import { distanceKm, NEARBY_HOSPITAL_RADIUS_KM, resolveHospitalCoords } from "@/lib/geo";
 import { isActiveRequestStatus, urgencyRank } from "@/lib/live-requests";
 import { tryCreateClient } from "@/lib/supabase/client";
@@ -728,16 +731,25 @@ export async function respondToAssignment(
 
   if (action === "accept") {
     const now = Date.now();
+    const offeredAt = new Date(current.assignedAt).getTime();
+    const responseMinutes =
+      Number.isFinite(offeredAt) && now >= offeredAt
+        ? Math.max(0.1, (now - offeredAt) / 60_000)
+        : null;
     store[requestId] = {
       ...current,
       status: "accepted",
-      assignedAt: new Date(now).toISOString(),
+      // Keep original offer time so avg response = accept − offer.
+      assignedAt: current.assignedAt,
       expiresAt: new Date(now + POST_ACCEPT_LIVE_MS).toISOString(),
     };
     writeStore(store);
     await persistAssignment(requestId, store[requestId]);
     await persistRequestStatus(requestId, "donor_accepted");
     notifyLive();
+    if (responseMinutes != null && responseMinutes <= 30) {
+      void recordDonorResponseSample(donorId, responseMinutes);
+    }
     return;
   }
 

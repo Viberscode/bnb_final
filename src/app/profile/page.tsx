@@ -208,22 +208,32 @@ export default function ProfilePage() {
             <div className="w-full space-y-8">
               <header className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
                 <div className="flex flex-col justify-center text-left">
-                  <p className="text-sm font-semibold text-ink-muted sm:text-base">
-                    {t("profile.welcomeBack")}{" "}
-                    <span className="font-extrabold text-ink">
-                      {ngo?.name || firstName}
-                    </span>
+                  <p className="-mt-1 font-display text-base font-black tracking-tight text-ink sm:text-lg">
+                    <span className="bg-gradient-to-r from-ink via-[#4a1c2a] to-crimson bg-clip-text text-transparent">
+                      {t("profile.welcomeBack")}
+                    </span>{" "}
+                    <span className="text-crimson">{ngo?.name || firstName}</span>
                   </p>
-                  <h1 className="mt-2 font-display text-[clamp(2.4rem,5.5vw,3.4rem)] font-black leading-[0.95] tracking-[-0.04em] text-ink">
+                  <h1 className="mt-1.5 font-display text-[clamp(2.4rem,5.5vw,3.4rem)] font-black leading-[0.95] tracking-[-0.04em] text-ink">
                     {t("profile.my")}{" "}
                     <span className="request-heading-live bg-gradient-to-r from-[#9f1239] via-[#ff2d4a] to-[#c4122f] bg-clip-text text-transparent">
                       {t("profile.account")}
                     </span>
                   </h1>
-                  <p className="mt-3 max-w-md text-sm font-semibold leading-relaxed text-ink-muted">
-                    {profile
-                      ? t("profile.hubDonorHint", { group: profile.bloodGroup })
-                      : t("profile.hubGuestHint")}
+                  <p className="mt-3 inline-flex max-w-md items-center rounded-full border border-crimson/15 bg-white/70 px-3.5 py-1.5 text-sm font-bold tracking-tight text-ink shadow-[0_8px_20px_-14px_rgba(196,18,47,0.45)] backdrop-blur-sm">
+                    {profile ? (
+                      <>
+                        <BloodGroupText group={profile.bloodGroup} />
+                        <span className="mx-2 text-crimson/40">·</span>
+                        <span className="text-ink-muted">
+                          {t("profile.hubPathHint")}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-ink-muted">
+                        {t("profile.hubGuestHint")}
+                      </span>
+                    )}
                   </p>
                 </div>
 

@@ -280,6 +280,14 @@ export function LandingHero() {
 
   function openVoice() {
     if (requireAuth("/?voice=1", t("voiceAssist.authMessage"))) {
+      // Prefetch mic permission while the modal mounts.
+      void navigator.mediaDevices
+        ?.getUserMedia({ audio: true })
+        .then((stream) => stream.getTracks().forEach((track) => track.stop()))
+        .catch(() => undefined);
+      if (typeof window !== "undefined") {
+        window.speechSynthesis?.getVoices();
+      }
       setVoiceOpen(true);
     }
   }

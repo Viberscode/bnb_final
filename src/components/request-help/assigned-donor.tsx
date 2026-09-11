@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Check, CheckCircle2, HeartHandshake, MapPin, X } from "lucide-react";
+import { Check, CheckCircle2, HeartHandshake, MapPin, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import {
   canShareContactDetails,
@@ -49,7 +49,7 @@ export function AssignedDonorLine({
     if (accepted) {
       return (
         <div
-          className="mt-3 overflow-hidden rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4 shadow-[0_16px_36px_-18px_rgba(5,150,105,0.55)]"
+          className="mt-3 overflow-hidden rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4 shadow-[0_16px_36px_-18px_rgba(5,150,105,0.55)] donor-accept-flash"
           onClick={(e) => e.stopPropagation()}
         >
           <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white">
@@ -57,7 +57,7 @@ export function AssignedDonorLine({
             {t("live.donorAccepted")}
           </p>
           <p className="mt-2 font-display text-2xl font-black leading-tight tracking-tight text-ink sm:text-[1.7rem]">
-            {label}
+            {t("match.searchAccepted")}
           </p>
           {assignment?.donorName ? (
             <p className="mt-1 text-sm font-bold text-emerald-800">
@@ -70,18 +70,8 @@ export function AssignedDonorLine({
               ) : null}
             </p>
           ) : null}
-          {onViewDonor && assignment?.donorId ? (
-            <button
-              type="button"
-              onClick={onViewDonor}
-              className="mt-3 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-deep px-4 text-base font-black uppercase tracking-wide text-white shadow-[0_14px_28px_-12px_rgba(5,150,105,0.8)] hover:brightness-110"
-            >
-              {t("match.viewDonor")}
-              <ArrowUpRight className="size-5" aria-hidden />
-            </button>
-          ) : null}
           {matchedRequestId && showWhatsApp ? (
-            <WhatsAppConnectButton requestId={matchedRequestId} className="mt-2" />
+            <WhatsAppConnectButton requestId={matchedRequestId} className="mt-3" />
           ) : null}
         </div>
       );
@@ -89,17 +79,7 @@ export function AssignedDonorLine({
 
     return (
       <div className="mt-2">
-        {pending && onViewDonor && assignment?.donorId ? (
-          <button
-            type="button"
-            onClick={onViewDonor}
-            className="text-left text-xs font-bold text-teal-deep underline-offset-2 hover:underline"
-          >
-            {label} · {t("match.viewDonor")}
-          </button>
-        ) : (
-          <p className="text-xs font-semibold text-ink-muted">{label}</p>
-        )}
+        <p className="text-xs font-semibold text-ink-muted">{label}</p>
         {matchedRequestId && showWhatsApp ? (
           <WhatsAppConnectButton requestId={matchedRequestId} className="mt-2" />
         ) : null}

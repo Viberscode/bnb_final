@@ -4,14 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Plus, Radio } from "lucide-react";
 import { MyRequestCard } from "@/components/profile/my-request-card";
-import { AssignedDonorDetails } from "@/components/request-help/assigned-donor-details";
 import { DonorSearchModal } from "@/components/request-help/donor-search-modal";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
-import { canViewAssignedDonor, startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
+import { startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
 import { fetchAvailableDonors } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
@@ -27,7 +26,6 @@ export default function MyRequestsPage() {
   const [donors, setDonors] = useState<DonorProfile[]>([]);
   const [ready, setReady] = useState(false);
   const [watchId, setWatchId] = useState<string | null>(null);
-  const [donorRequestId, setDonorRequestId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [waitingId, setWaitingId] = useState<string | null>(null);
   const ownedRequests = useMemo(
@@ -48,6 +46,22 @@ export default function MyRequestsPage() {
     () => withAssignments(ownedRequests, otherDonors),
     [ownedRequests, otherDonors, now],
   );
+
+  useEffect(() => {
+    const accepted = assigned.find(
+      (request) => request.assignment?.status === "accepted",
+    );
+    if (accepted) {
+      setWatchId(accepted.id);
+    }
+  }, [
+    assigned
+      .map(
+        (request) =>
+          `${request.id}:${request.assignment?.status}:${request.assignment?.assignedAt}`,
+      )
+      .join("|"),
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -162,15 +176,6 @@ export default function MyRequestsPage() {
                         key={request.id}
                         request={request}
                         onWatchSearch={() => setWatchId(request.id)}
-                        onViewDonor={
-                          canViewAssignedDonor(
-                            request,
-                            request.assignment,
-                            user.id,
-                          )
-                            ? () => setDonorRequestId(request.id)
-                            : undefined
-                        }
                         confirming={completingId === request.id}
                         waiting={waitingId === request.id}
                         onConfirmSolved={() => {
@@ -205,24 +210,6 @@ export default function MyRequestsPage() {
               <DonorSearchModal
                 request={watching}
                 onClose={() => setWatchId(null)}
-                onViewDonor={
-                  canViewAssignedDonor(watching, watching.assignment, user?.id)
-                    ? () => setDonorRequestId(watching.id)
-                    : undefined
-                }
-              />
-            ) : null;
-          })()
-        : null}
-      {donorRequestId
-        ? (() => {
-            const selected = assigned.find((item) => item.id === donorRequestId);
-            return selected?.assignment?.donorId &&
-              canViewAssignedDonor(selected, selected.assignment, user?.id) ? (
-              <AssignedDonorDetails
-                assignment={selected.assignment}
-                requestId={selected.id}
-                onClose={() => setDonorRequestId(null)}
               />
             ) : null;
           })()

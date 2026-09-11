@@ -177,6 +177,13 @@ export function RequestHelpForm() {
 
   const blockedByActive = Boolean(liveActive);
 
+  useEffect(() => {
+    if (liveActive?.assignment?.status === "accepted") {
+      setSearchOpen(true);
+      setDonorOpen(false);
+    }
+  }, [liveActive?.id, liveActive?.assignment?.status, liveActive?.assignment?.assignedAt]);
+
   function setPeopleAffected(next: number) {
     const count = Math.min(MAX_PEOPLE, Math.max(MIN_PEOPLE, Math.round(next) || MIN_PEOPLE));
     setPatientsCount(count);
@@ -421,9 +428,6 @@ export function RequestHelpForm() {
                   assignment={liveActive.assignment}
                   viewer="requester"
                   requestId={liveActive.id}
-                  onViewDonor={
-                    showAssignedDonor ? () => setDonorOpen(true) : undefined
-                  }
                 />
                 <RequesterConfirmPanel
                   request={liveActive}
@@ -534,7 +538,6 @@ export function RequestHelpForm() {
         <DonorSearchModal
           request={liveActive}
           onClose={() => setSearchOpen(false)}
-          onViewDonor={showAssignedDonor ? () => setDonorOpen(true) : undefined}
         />
       ) : null}
       {donorOpen && showAssignedDonor && liveActive.assignment?.donorId ? (

@@ -497,20 +497,20 @@ export function BecomeDonorForm() {
             type="button"
             onClick={enableLiveLocation}
             className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold transition",
+              "inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-black tracking-wide transition",
               followLive
-                ? "bg-teal text-white"
+                ? "bg-gradient-to-r from-[#0f9f7a] to-[#0a6b54] text-white shadow-[0_12px_24px_-10px_rgba(15,159,122,0.85)] ring-1 ring-white/25 hover:-translate-y-0.5 hover:brightness-110"
                 : "border border-line bg-white text-ink hover:bg-black/[0.03]",
             )}
           >
-            <Navigation className="size-3.5" aria-hidden />
+            <Navigation className="size-4" aria-hidden />
             {t("donor.followLive")}
           </button>
           <button
             type="button"
             onClick={() => setFollowLive(false)}
             className={cn(
-              "inline-flex h-10 items-center rounded-xl px-3.5 text-sm font-bold transition",
+              "inline-flex h-11 items-center rounded-2xl px-4 text-sm font-bold transition",
               !followLive
                 ? "bg-slate-800 text-white"
                 : "border border-line bg-white text-ink hover:bg-black/[0.03]",
@@ -529,11 +529,6 @@ export function BecomeDonorForm() {
               {t("donor.readingAddress")}
             </span>
           ) : null}
-          {followLive && coords ? (
-            <span className="text-xs font-semibold text-teal-deep">
-              {t("donor.gpsAccuracy", { m: Math.round(coords.accuracy) })}
-            </span>
-          ) : null}
           {followLive && (locStatus === "denied" || locStatus === "unavailable") ? (
             <button
               type="button"
@@ -542,11 +537,6 @@ export function BecomeDonorForm() {
             >
               {t("donor.errLocation")}
             </button>
-          ) : null}
-          {followLive && locStatus === "tracking" && city && area ? (
-            <span className="text-xs font-semibold text-teal-deep">
-              {area}, {city}
-            </span>
           ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

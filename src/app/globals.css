@@ -59,7 +59,13 @@ html[data-locale="hi"] body {
   font-family: var(--font-hindi), var(--font-body), sans-serif;
 }
 
+/* Prefer Latin display for brand wordmarks; Devanagari glyphs still fall back. */
 html[data-locale="hi"] .font-display {
+  font-family: var(--font-display), var(--font-hindi), sans-serif;
+}
+
+/* Pure Hindi display headings (no Latin brand) — use Devanagari first. */
+html[data-locale="hi"] .font-display-hi {
   font-family: var(--font-hindi), var(--font-display), sans-serif;
 }
 

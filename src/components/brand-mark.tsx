@@ -115,6 +115,7 @@ export function BrandLogo({
           size === "lg" && "text-2xl sm:text-3xl",
           isLight ? "text-white" : "text-ink",
         )}
+        lang="en"
       >
         {wordmark}
         <span className="text-crimson" aria-hidden>

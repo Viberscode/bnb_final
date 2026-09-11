@@ -242,6 +242,7 @@ export function HeroHelpStory({ className }: { className?: string }) {
             "font-display text-5xl font-extrabold tracking-[-0.05em] text-white sm:text-6xl",
             phase === "brand" && "story-brand-finale",
           )}
+          lang="en"
         >
           BloodNearby
           <span className="text-[#ff2d4a]">.</span>

@@ -24,10 +24,11 @@ export function BloodKitHeading({
       id={id}
       className={cn(
         "font-display font-extrabold leading-[0.88] tracking-[-0.05em] text-white",
-        "text-[clamp(2.75rem,9vw,5.5rem)]",
+        "whitespace-nowrap text-[clamp(2.75rem,9vw,5.5rem)]",
         className,
       )}
       aria-label="BloodNearby"
+      lang="en"
     >
       {letters.map((letter, i) => (
         <span

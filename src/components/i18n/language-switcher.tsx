@@ -7,6 +7,8 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { LOCALES } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
+const MENU_ESTIMATE_PX = 96;
+
 export function LanguageSwitcher({
   variant = "hero",
 }: {
@@ -51,9 +53,13 @@ export function LanguageSwitcher({
       const r = buttonRef.current?.getBoundingClientRect();
       if (!r) return;
       const width = Math.max(r.width, isHero ? r.width : 144);
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openUp = spaceBelow < MENU_ESTIMATE_PX + 12 && r.top > spaceBelow;
+      const top = openUp ? Math.max(8, r.top - MENU_ESTIMATE_PX - 6) : r.bottom + 6;
+
       setMenuStyle({
         position: "fixed",
-        top: r.bottom + 6,
+        top,
         ...(alignRight
           ? { right: Math.max(8, window.innerWidth - r.right), left: "auto" }
           : { left: r.left, right: "auto" }),
@@ -63,9 +69,30 @@ export function LanguageSwitcher({
     };
 
     update();
+    // Re-measure after paint once menu height is known
+    const raf = window.requestAnimationFrame(() => {
+      const menu = menuRef.current;
+      const r = buttonRef.current?.getBoundingClientRect();
+      if (!menu || !r) return;
+      const height = menu.getBoundingClientRect().height;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openUp = spaceBelow < height + 12 && r.top > spaceBelow;
+      setMenuStyle((prev) =>
+        prev
+          ? {
+              ...prev,
+              top: openUp
+                ? Math.max(8, r.top - height - 6)
+                : r.bottom + 6,
+            }
+          : prev,
+      );
+    });
+
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
     return () => {
+      window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };

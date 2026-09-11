@@ -8,20 +8,30 @@ import "leaflet/dist/leaflet.css";
 type MapHospital = Hospital & { distanceKm?: number };
 
 const DEFAULT_CENTER = { lat: 28.7165, lng: 77.1178 };
-const MARKER_SIZE = 26;
+/** Visual size of the + badge */
+const MARKER_SIZE = 24;
+/** Larger hit box so the glow/ring is still clickable */
+const HIT_SIZE = 36;
 
 function hospitalIconHtml(selected: boolean) {
   const ring = selected
-    ? "0 0 0 3px rgba(255,255,255,0.95), 0 0 0 6px rgba(196,18,47,0.45)"
-    : "0 0 0 3px rgba(255,255,255,0.95), 0 0 0 6px rgba(196,18,47,0.28)";
+    ? "0 0 0 3px rgba(255,255,255,0.98), 0 0 0 6px rgba(196,18,47,0.5)"
+    : "0 0 0 3px rgba(255,255,255,0.98), 0 0 0 6px rgba(196,18,47,0.3)";
+  const offset = (HIT_SIZE - MARKER_SIZE) / 2;
   return `<span style="
-    display:inline-flex;align-items:center;justify-content:center;
-    width:${MARKER_SIZE}px;height:${MARKER_SIZE}px;border-radius:9999px;
-    background:#c4122f;box-shadow:${ring};cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    width:${HIT_SIZE}px;height:${HIT_SIZE}px;cursor:pointer;
   ">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round">
-      <path d="M12 5v14M5 12h14"/>
-    </svg>
+    <span style="
+      display:inline-flex;align-items:center;justify-content:center;
+      width:${MARKER_SIZE}px;height:${MARKER_SIZE}px;margin:${offset}px;
+      border-radius:9999px;background:#c4122f;box-shadow:${ring};
+      pointer-events:none;
+    ">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </span>
   </span>`;
 }
 
@@ -91,11 +101,16 @@ export function HospitalLiveMap({
         scrollWheelZoom: true,
       }).setView([center.lat, center.lng], 14);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(map);
+      // Clean basemap without OSM's baked-in hospital + icons (those weren't clickable).
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        {
+          maxZoom: 20,
+          subdomains: "abcd",
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        },
+      ).addTo(map);
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
@@ -149,21 +164,24 @@ export function HospitalLiveMap({
         const icon = L.divIcon({
           className: "bloodkit-hospital-marker",
           html: hospitalIconHtml(selected),
-          iconSize: [MARKER_SIZE, MARKER_SIZE],
-          iconAnchor: [MARKER_SIZE / 2, MARKER_SIZE / 2],
+          iconSize: [HIT_SIZE, HIT_SIZE],
+          iconAnchor: [HIT_SIZE / 2, HIT_SIZE / 2],
         });
         const marker = L.marker([hospital.lat, hospital.lng], {
           icon,
           title: hospital.name,
           riseOnHover: true,
-          zIndexOffset: selected ? 200 : 0,
+          interactive: true,
+          keyboard: true,
+          zIndexOffset: selected ? 400 : 250,
         });
         marker.bindTooltip(hospital.name, {
           direction: "top",
-          offset: [0, -14],
+          offset: [0, -16],
           opacity: 0.95,
         });
-        marker.on("click", () => {
+        marker.on("click", (event) => {
+          L.DomEvent.stopPropagation(event);
           onSelectRef.current(hospital);
         });
         group.addLayer(marker);
@@ -214,7 +232,7 @@ export function HospitalLiveMap({
         icon,
         title: "You",
         interactive: false,
-        zIndexOffset: 500,
+        zIndexOffset: 600,
       });
       marker.addTo(map);
       userMarkerRef.current = marker;

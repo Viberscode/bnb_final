@@ -50,13 +50,17 @@ export async function GET(request: Request) {
   try {
     const radiusM = Math.round(radiusKm * 1000);
     const query = `
-      [out:json][timeout:12];
+      [out:json][timeout:15];
       (
         node["amenity"="hospital"](around:${radiusM},${lat},${lng});
         way["amenity"="hospital"](around:${radiusM},${lat},${lng});
+        relation["amenity"="hospital"](around:${radiusM},${lat},${lng});
         node["healthcare"="hospital"](around:${radiusM},${lat},${lng});
+        way["healthcare"="hospital"](around:${radiusM},${lat},${lng});
+        node["amenity"="clinic"]["name"](around:${radiusM},${lat},${lng});
+        way["amenity"="clinic"]["name"](around:${radiusM},${lat},${lng});
       );
-      out center tags 40;
+      out center tags 80;
     `;
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
@@ -90,7 +94,7 @@ export async function GET(request: Request) {
           lat: hLat as number,
           lng: hLng as number,
         });
-        if (hospitals.length >= 30) break;
+        if (hospitals.length >= 60) break;
       }
     }
   } catch {

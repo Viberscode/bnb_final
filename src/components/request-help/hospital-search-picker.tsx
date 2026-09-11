@@ -137,17 +137,16 @@ export function HospitalSearchPicker({
     let active = true;
     setMapLoading(true);
 
-    const local = DEMO_HOSPITALS.filter(
-      (hospital) =>
-        distanceKm(mapCenter.lat, mapCenter.lng, hospital.lat, hospital.lng) <= 8,
-    ).map((item) => withDistance(item, userCoords ?? mapCenter));
+    const local = DEMO_HOSPITALS.map((item) =>
+      withDistance(item, userCoords ?? mapCenter),
+    );
 
     setMapPins(local);
 
     void (async () => {
       try {
         const res = await fetch(
-          `/api/hospitals/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radiusKm=5`,
+          `/api/hospitals/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radiusKm=12`,
           { signal: controller.signal },
         );
         if (!res.ok || !active) return;
@@ -309,6 +308,7 @@ export function HospitalSearchPicker({
             center={mapCenter}
             hospitals={mapPins}
             selectedId={value?.id}
+            userLocation={userCoords ?? null}
             onSelect={(hospital) => pick(hospital, true)}
           />
         </div>

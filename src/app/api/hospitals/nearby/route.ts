@@ -35,8 +35,8 @@ export async function GET(request: Request) {
   const lat = Number(searchParams.get("lat"));
   const lng = Number(searchParams.get("lng"));
   const radiusKm = Math.min(
-    12,
-    Math.max(1, Number(searchParams.get("radiusKm") ?? 4) || 4),
+    25,
+    Math.max(1, Number(searchParams.get("radiusKm") ?? 12) || 12),
   );
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {

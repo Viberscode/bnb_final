@@ -97,17 +97,15 @@ export function HospitalLiveMap({
 
       const map = L.map(containerRef.current, {
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
         scrollWheelZoom: true,
       }).setView([center.lat, center.lng], 14);
 
-      // Free Esri street tiles — no API key, no baked-in hospital POI icons.
-      L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-        {
-          maxZoom: 19,
-        },
-      ).addTo(map);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;

@@ -291,7 +291,7 @@ export function LandingHero() {
     >
       <HeroLifeBackdrop />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-x-10 lg:gap-y-8 lg:py-20">
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-8 px-5 pb-28 pt-24 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-x-10 lg:gap-y-0 lg:py-20">
         <div className="max-w-xl lg:col-start-1 lg:row-start-1">
           <BloodKitHeading id="hero-brand" />
 
@@ -300,19 +300,16 @@ export function LandingHero() {
           </div>
         </div>
 
-        <div className="animate-hero-reveal-delay-1 hidden w-full lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:flex lg:flex-col lg:items-stretch lg:gap-4 lg:self-stretch">
+        <div className="animate-hero-reveal-delay-1 hidden w-full max-w-md justify-self-end lg:col-start-2 lg:row-start-1 lg:block lg:self-end">
           <VoiceLaunchButton
-            className="w-full shrink-0"
+            className="w-full"
             onClick={openVoice}
             title={t("hero.voiceTitle")}
             subtitle={t("hero.voiceSub")}
           />
-          <div className="relative min-h-[18rem] w-full flex-1">
-            <HeroHelpStory className="h-full w-full max-w-none" />
-          </div>
         </div>
 
-        <div className="animate-hero-reveal-delay-2 mt-8 w-full sm:mt-10 lg:col-start-1 lg:row-start-2 lg:mt-0">
+        <div className="animate-hero-reveal-delay-2 col-span-full mt-8 grid w-full grid-cols-1 items-stretch gap-5 sm:mt-10 lg:col-span-2 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-x-10">
           <div className="grid w-full max-w-md grid-cols-1 gap-5 sm:max-w-none sm:grid-cols-3 sm:gap-4 lg:max-w-md lg:grid-cols-1 lg:gap-5">
             {ACTIONS.filter((action) => !(action.role === "ngo" && ngoName)).map((action) => (
               <button
@@ -401,6 +398,12 @@ export function LandingHero() {
                 )}
               </button>
             ))}
+          </div>
+
+          <div className="relative hidden min-h-0 lg:block">
+            <div className="absolute inset-0">
+              <HeroHelpStory className="h-full max-w-none" />
+            </div>
           </div>
         </div>
       </div>

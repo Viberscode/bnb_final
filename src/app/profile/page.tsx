@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Building2,
-  Droplets,
   HeartHandshake,
   Radio,
   UserRound,
@@ -14,7 +13,6 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
-import { BloodGroupText } from "@/components/request-help/blood-group-mark";
 import {
   fetchDonorProfile,
   subscribeDonorProfile,
@@ -206,83 +204,22 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="w-full space-y-8">
-              <header className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-8">
-                <div className="flex flex-col justify-center text-left">
-                  <p className="text-sm font-semibold text-ink-muted sm:text-base">
-                    {t("profile.welcomeBack")}{" "}
-                    <span className="font-extrabold text-ink">
-                      {ngo?.name || firstName}
-                    </span>
-                  </p>
-                  <h1 className="mt-2 font-display text-[clamp(2.4rem,5.5vw,3.4rem)] font-black leading-[0.95] tracking-[-0.04em] text-ink">
-                    {t("profile.my")}{" "}
-                    <span className="request-heading-live bg-gradient-to-r from-[#9f1239] via-[#ff2d4a] to-[#c4122f] bg-clip-text text-transparent">
-                      {t("profile.account")}
-                    </span>
-                  </h1>
-                  <p className="mt-3 max-w-md text-sm font-semibold leading-relaxed text-ink-muted">
-                    {profile
-                      ? t("profile.hubDonorHint", { group: profile.bloodGroup })
-                      : t("profile.hubGuestHint")}
-                  </p>
-                </div>
-
-                <aside className="relative overflow-hidden rounded-[1.6rem] border border-crimson/15 bg-white/85 p-5 shadow-[0_20px_44px_-28px_rgba(196,18,47,0.45)] backdrop-blur-sm sm:p-6">
-                  <div
-                    className="pointer-events-none absolute -right-10 -top-12 size-36 rounded-full bg-crimson/10 blur-2xl"
-                    aria-hidden
-                  />
-                  <div
-                    className="pointer-events-none absolute -bottom-14 left-8 size-32 rounded-full bg-teal/10 blur-2xl"
-                    aria-hidden
-                  />
-
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div className="inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] text-white shadow-[0_14px_28px_-12px_rgba(196,18,47,0.7)]">
-                      <Droplets className="size-5" aria-hidden />
-                    </div>
-                    <p className="text-right text-[0.65rem] font-black uppercase tracking-[0.18em] text-crimson">
-                      {t("profile.accountKicker")}
-                    </p>
-                  </div>
-
-                  <p className="relative mt-5 font-display text-lg font-black tracking-tight text-ink">
-                    {t("profile.hubSnapshot")}
-                  </p>
-
-                  <div className="relative mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-[#ffd0d8]/80 bg-gradient-to-br from-[#fff7f8] to-white px-3.5 py-3">
-                      <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-crimson">
-                        {t("profile.hubLive")}
-                      </p>
-                      <p className="mt-1 font-display text-2xl font-black tabular-nums text-ink">
-                        {requestCount}
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold text-ink-muted">
-                        {t("profile.hubLiveHint")}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-teal/20 bg-gradient-to-br from-[#f3fbfa] to-white px-3.5 py-3">
-                      <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-teal-deep">
-                        {t("profile.hubDonor")}
-                      </p>
-                      <p className="mt-1 font-display text-2xl font-black text-ink">
-                        {profile ? (
-                          <BloodGroupText group={profile.bloodGroup} />
-                        ) : (
-                          "—"
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold text-ink-muted">
-                        {profile
-                          ? profile.available
-                            ? t("profile.onStandby")
-                            : t("profile.offline")
-                          : t("profile.hubNotRegistered")}
-                      </p>
-                    </div>
-                  </div>
-                </aside>
+              <header className="text-left">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-crimson">
+                  {t("profile.accountKicker")}
+                </p>
+                <h1 className="mt-2 font-display text-[clamp(2.2rem,5vw,3.2rem)] font-black leading-tight tracking-[-0.04em] text-ink">
+                  {t("profile.my")}{" "}
+                  <span className="request-heading-live bg-gradient-to-r from-[#9f1239] via-[#ff2d4a] to-[#c4122f] bg-clip-text text-transparent">
+                    {t("profile.account")}
+                  </span>
+                </h1>
+                <p className="mt-2 text-sm font-semibold text-ink-muted sm:text-base">
+                  {t("profile.welcomeBack")}{" "}
+                  <span className="font-extrabold text-ink">
+                    {ngo?.name || firstName}
+                  </span>
+                </p>
               </header>
 
               <div className="grid gap-4 sm:grid-cols-3 sm:gap-5">

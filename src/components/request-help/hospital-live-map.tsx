@@ -8,30 +8,20 @@ import "leaflet/dist/leaflet.css";
 type MapHospital = Hospital & { distanceKm?: number };
 
 const DEFAULT_CENTER = { lat: 28.7165, lng: 77.1178 };
-/** Visual size of the + badge */
-const MARKER_SIZE = 24;
-/** Larger hit box so the glow/ring is still clickable */
-const HIT_SIZE = 36;
+const MARKER_SIZE = 26;
 
 function hospitalIconHtml(selected: boolean) {
   const ring = selected
-    ? "0 0 0 3px rgba(255,255,255,0.98), 0 0 0 6px rgba(196,18,47,0.5)"
-    : "0 0 0 3px rgba(255,255,255,0.98), 0 0 0 6px rgba(196,18,47,0.3)";
-  const offset = (HIT_SIZE - MARKER_SIZE) / 2;
+    ? "0 0 0 3px rgba(255,255,255,0.95), 0 0 0 6px rgba(196,18,47,0.45)"
+    : "0 0 0 3px rgba(255,255,255,0.95), 0 0 0 6px rgba(196,18,47,0.28)";
   return `<span style="
-    display:flex;align-items:center;justify-content:center;
-    width:${HIT_SIZE}px;height:${HIT_SIZE}px;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    width:${MARKER_SIZE}px;height:${MARKER_SIZE}px;border-radius:9999px;
+    background:#c4122f;box-shadow:${ring};cursor:pointer;
   ">
-    <span style="
-      display:inline-flex;align-items:center;justify-content:center;
-      width:${MARKER_SIZE}px;height:${MARKER_SIZE}px;margin:${offset}px;
-      border-radius:9999px;background:#c4122f;box-shadow:${ring};
-      pointer-events:none;
-    ">
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round">
-        <path d="M12 5v14M5 12h14"/>
-      </svg>
-    </span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
   </span>`;
 }
 
@@ -159,24 +149,21 @@ export function HospitalLiveMap({
         const icon = L.divIcon({
           className: "bloodkit-hospital-marker",
           html: hospitalIconHtml(selected),
-          iconSize: [HIT_SIZE, HIT_SIZE],
-          iconAnchor: [HIT_SIZE / 2, HIT_SIZE / 2],
+          iconSize: [MARKER_SIZE, MARKER_SIZE],
+          iconAnchor: [MARKER_SIZE / 2, MARKER_SIZE / 2],
         });
         const marker = L.marker([hospital.lat, hospital.lng], {
           icon,
           title: hospital.name,
           riseOnHover: true,
-          interactive: true,
-          keyboard: true,
-          zIndexOffset: selected ? 400 : 250,
+          zIndexOffset: selected ? 200 : 0,
         });
         marker.bindTooltip(hospital.name, {
           direction: "top",
-          offset: [0, -16],
+          offset: [0, -14],
           opacity: 0.95,
         });
-        marker.on("click", (event) => {
-          L.DomEvent.stopPropagation(event);
+        marker.on("click", () => {
           onSelectRef.current(hospital);
         });
         group.addLayer(marker);
@@ -227,7 +214,7 @@ export function HospitalLiveMap({
         icon,
         title: "You",
         interactive: false,
-        zIndexOffset: 600,
+        zIndexOffset: 500,
       });
       marker.addTo(map);
       userMarkerRef.current = marker;

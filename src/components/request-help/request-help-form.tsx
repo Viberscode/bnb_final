@@ -320,6 +320,8 @@ export function RequestHelpForm() {
         hospitalId: selectedHospital.id,
         hospitalName: selectedHospital.name,
         hospitalArea: `${selectedHospital.area}, ${selectedHospital.city}`,
+        hospitalLat: selectedHospital.lat,
+        hospitalLng: selectedHospital.lng,
         contactName: contactName.trim(),
         phone: `+91${mobile}`,
         units: totalUnitsNeeded,

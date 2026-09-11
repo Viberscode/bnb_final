@@ -1,7 +1,7 @@
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { donorMatchesRequest } from "@/lib/blood-compatibility";
 import { recordDonorNoShow } from "@/lib/donor-activity";
-import { NEARBY_HOSPITAL_RADIUS_KM } from "@/lib/geo";
+import { distanceKm, NEARBY_HOSPITAL_RADIUS_KM, resolveHospitalCoords } from "@/lib/geo";
 import { isActiveRequestStatus, urgencyRank } from "@/lib/live-requests";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -36,16 +36,34 @@ function placesOverlap(a: string, b: string) {
   return a === b || a.includes(b) || b.includes(a);
 }
 
-/** Estimated km from a donor's city/area to the request hospital. */
+/** Real GPS distance when coords exist; otherwise city/area heuristic. */
 export function donorDistanceKm(
-  donor: Pick<DonorProfile, "city" | "area">,
-  request: Pick<BloodRequest, "hospitalId" | "hospitalArea" | "distanceKm">,
+  donor: Pick<DonorProfile, "city" | "area" | "lat" | "lng">,
+  request: Pick<
+    BloodRequest,
+    "hospitalId" | "hospitalArea" | "distanceKm" | "hospitalLat" | "hospitalLng"
+  >,
 ): number {
-  const hospital = DEMO_HOSPITALS.find((item) => item.id === request.hospitalId);
+  const hospital = resolveHospitalCoords({
+    hospitalId: request.hospitalId,
+    hospitalLat: request.hospitalLat,
+    hospitalLng: request.hospitalLng,
+    hospitals: DEMO_HOSPITALS,
+  });
+
+  if (
+    typeof donor.lat === "number" &&
+    typeof donor.lng === "number" &&
+    hospital
+  ) {
+    return distanceKm(donor.lat, donor.lng, hospital.lat, hospital.lng);
+  }
+
+  const demo = DEMO_HOSPITALS.find((item) => item.id === request.hospitalId);
   const donorCity = normalizePlace(donor.city);
   const donorArea = normalizePlace(donor.area);
-  const hospitalCity = normalizePlace(hospital?.city ?? "");
-  const hospitalArea = normalizePlace(hospital?.area ?? request.hospitalArea);
+  const hospitalCity = normalizePlace(demo?.city ?? "");
+  const hospitalArea = normalizePlace(demo?.area ?? request.hospitalArea);
 
   if (placesOverlap(donorArea, hospitalArea)) return 1.5;
   if (placesOverlap(donorCity, hospitalCity)) return 7.5;

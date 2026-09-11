@@ -26,10 +26,13 @@ import { RequesterConfirmPanel } from "@/components/request-help/requester-confi
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { neededBloodGroups, totalUnits, unitsByGroup } from "@/lib/blood-compatibility";
-import { formatDistance } from "@/lib/geo";
+import { formatDistance, distanceKm, resolveHospitalCoords } from "@/lib/geo";
+import { DEMO_HOSPITALS } from "@/data/demo";
+import { useDonorLiveCoords } from "@/hooks/use-donor-live-coords";
 import {
   canShareContactDetails,
   canViewAssignedDonor,
+  donorDistanceKm,
   isAssignedDonor,
   isOwnDonor,
   offerAssignmentToDonor,
@@ -112,6 +115,7 @@ function RequestCard({
   canOpen,
   confirming,
   waiting,
+  distanceLabel,
   onOpen,
   onAccepted,
   onWaitMore,
@@ -123,6 +127,7 @@ function RequestCard({
   canOpen?: boolean;
   confirming?: boolean;
   waiting?: boolean;
+  distanceLabel?: string | null;
   onOpen?: () => void;
   onAccepted?: () => void;
   onWaitMore?: () => void;
@@ -135,6 +140,11 @@ function RequestCard({
     !done &&
     (request.assignment?.status === "accepted" ||
       request.status === "donor_accepted");
+  const shownDistance =
+    distanceLabel ??
+    (typeof request.distanceKm === "number"
+      ? formatDistance(request.distanceKm)
+      : null);
 
   return (
     <article
@@ -264,9 +274,9 @@ function RequestCard({
             <span className="mt-0.5 block text-xs font-semibold text-ink-muted">
               {request.hospitalArea}
             </span>
-            {typeof request.distanceKm === "number" ? (
+            {shownDistance ? (
               <span className="mt-0.5 block text-xs font-bold text-ink">
-                {formatDistance(request.distanceKm)}
+                {shownDistance}
               </span>
             ) : null}
           </span>
@@ -307,15 +317,18 @@ function RequestCard({
 function RequestDetailModal({
   request,
   donorId,
+  donorCoords,
   onClose,
   onRespond,
 }: {
   request: BloodRequest;
   donorId?: string;
+  donorCoords?: { lat?: number; lng?: number } | null;
   onClose: () => void;
   onRespond?: (action: "accept" | "decline") => void;
 }) {
   const { t } = useLanguage();
+  const { coords: from } = useDonorLiveCoords(donorCoords);
   const breakdown = unitsByGroup(request);
   const unitsTotal = totalUnits(request);
   const assignedToViewer = isAssignedDonor(request, donorId);
@@ -327,6 +340,40 @@ function RequestDetailModal({
       : request.urgency === "urgent"
         ? t("urgency.urgentWindow")
         : t("urgency.plannedWindow");
+
+  const hospital = useMemo(
+    () =>
+      resolveHospitalCoords({
+        hospitalId: request.hospitalId,
+        hospitalLat: request.hospitalLat,
+        hospitalLng: request.hospitalLng,
+        hospitals: DEMO_HOSPITALS,
+      }),
+    [request.hospitalId, request.hospitalLat, request.hospitalLng],
+  );
+
+  const liveDistanceLabel = useMemo(() => {
+    if (from && hospital) {
+      return formatDistance(
+        distanceKm(from.lat, from.lng, hospital.lat, hospital.lng),
+      );
+    }
+    if (donorCoords && typeof request.assignment?.distanceKm === "number") {
+      return formatDistance(request.assignment.distanceKm);
+    }
+    if (typeof request.distanceKm === "number") {
+      return formatDistance(request.distanceKm);
+    }
+    return null;
+  }, [
+    from?.lat,
+    from?.lng,
+    hospital?.lat,
+    hospital?.lng,
+    donorCoords,
+    request.assignment?.distanceKm,
+    request.distanceKm,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -466,9 +513,7 @@ function RequestDetailModal({
             </dd>
             <dd className="mt-0.5 text-sm font-semibold text-ink-muted">
               {request.hospitalArea}
-              {typeof request.distanceKm === "number"
-                ? ` · ${request.distanceKm.toFixed(1)} km`
-                : ""}
+              {liveDistanceLabel ? ` · ${liveDistanceLabel}` : ""}
             </dd>
           </div>
 
@@ -550,10 +595,24 @@ export function LiveRequests({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [waitingId, setWaitingId] = useState<string | null>(null);
   const [donorDetails, setDonorDetails] = useState<BloodRequest | null>(null);
+  const { coords: liveDonorCoords } = useDonorLiveCoords(donor);
+  const liveDonor = useMemo(() => {
+    if (!donor) return null;
+    if (!liveDonorCoords) return donor;
+    return {
+      ...donor,
+      lat: liveDonorCoords.lat,
+      lng: liveDonorCoords.lng,
+    };
+  }, [donor, liveDonorCoords?.lat, liveDonorCoords?.lng]);
   const pool =
-    donor && !donors.some((item) => item.id === donor.id)
-      ? [...donors, donor]
-      : donors;
+    liveDonor && !donors.some((item) => item.id === liveDonor.id)
+      ? [...donors, liveDonor]
+      : liveDonor
+        ? donors.map((item) =>
+            item.id === liveDonor.id ? liveDonor : item,
+          )
+        : donors;
   const now = useAssignmentEngine(requests, pool, { allowCreate: false });
 
   useEffect(() => {
@@ -579,12 +638,12 @@ export function LiveRequests({
     };
   }, [user?.id]);
 
-  const filterToMatches = Boolean(donor && !showAll);
+  const filterToMatches = Boolean(liveDonor && !showAll);
 
   const sorted = useMemo(() => {
     let list = withAssignments(requests, pool, { allowCreate: false });
-    if (filterToMatches && donor) {
-      const ranked = rankRequestsForDonor(list, donor);
+    if (filterToMatches && liveDonor) {
+      const ranked = rankRequestsForDonor(list, liveDonor);
       if (highlightId && !ranked.some((item) => item.id === highlightId)) {
         const extra = list.find((item) => item.id === highlightId);
         return extra ? [extra, ...ranked] : ranked;
@@ -600,7 +659,7 @@ export function LiveRequests({
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     });
-  }, [requests, pool, filterToMatches, donor, highlightId, now]);
+  }, [requests, pool, filterToMatches, liveDonor, highlightId, now]);
 
   const visible = typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 
@@ -715,12 +774,17 @@ export function LiveRequests({
               request={request}
               highlighted={highlightId === request.id}
               isMine={Boolean(user?.id && request.userId === user.id)}
-              canOpen={Boolean(donor && !isOwnDonor(request, donor))}
+              canOpen={Boolean(liveDonor && !isOwnDonor(request, liveDonor))}
               confirming={confirmingId === request.id}
               waiting={waitingId === request.id}
+              distanceLabel={
+                liveDonor
+                  ? formatDistance(donorDistanceKm(liveDonor, request))
+                  : null
+              }
               onOpen={() => {
-                if (donor && !isOwnDonor(request, donor)) {
-                  const offered = offerAssignmentToDonor(request, donor);
+                if (liveDonor && !isOwnDonor(request, liveDonor)) {
+                  const offered = offerAssignmentToDonor(request, liveDonor);
                   setRequests((prev) =>
                     prev.map((item) =>
                       item.id === offered.id
@@ -808,6 +872,7 @@ export function LiveRequests({
             request={
               sorted.find((item) => item.id === openRequest.id) ?? openRequest
             }
+            donorCoords={liveDonor}
             onClose={() => setOpenRequest(null)}
             onAccept={() => {
               void respondToAssignment(
@@ -833,6 +898,7 @@ export function LiveRequests({
               sorted.find((item) => item.id === openRequest.id) ?? openRequest
             }
             donorId={donor.id}
+            donorCoords={liveDonor}
             onClose={() => setOpenRequest(null)}
             onRespond={(action) => {
               void respondToAssignment(

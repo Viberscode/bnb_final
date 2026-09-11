@@ -24,6 +24,8 @@ type BloodRequestRow = {
   hospital_id: string;
   hospital_name: string;
   hospital_area: string;
+  hospital_lat?: number | null;
+  hospital_lng?: number | null;
   contact_name: string;
   phone: string | null;
   units: number;
@@ -57,12 +59,16 @@ function parseNeedMeta(raw: string): {
   patientsCount?: number;
   bloodGroups?: BloodGroup[];
   groupUnits?: Partial<Record<BloodGroup, number>>;
+  hospitalLat?: number;
+  hospitalLng?: number;
 } {
   try {
     const parsed = JSON.parse(raw) as {
       patients?: number;
       groups?: string[];
       unitsByGroup?: Record<string, number>;
+      hLat?: number;
+      hLng?: number;
     };
     const groups = (parsed.groups ?? []).filter((group): group is BloodGroup =>
       (BLOOD_GROUPS as string[]).includes(group),
@@ -74,6 +80,14 @@ function parseNeedMeta(raw: string): {
           : undefined,
       bloodGroups: groups.length ? groups : undefined,
       groupUnits: parseGroupUnits(parsed.unitsByGroup),
+      hospitalLat:
+        typeof parsed.hLat === "number" && Number.isFinite(parsed.hLat)
+          ? parsed.hLat
+          : undefined,
+      hospitalLng:
+        typeof parsed.hLng === "number" && Number.isFinite(parsed.hLng)
+          ? parsed.hLng
+          : undefined,
     };
   } catch {
     return {};
@@ -89,12 +103,16 @@ function splitVoiceFromNotes(
   patientsCount?: number;
   bloodGroups?: BloodGroup[];
   groupUnits?: Partial<Record<BloodGroup, number>>;
+  hospitalLat?: number;
+  hospitalLng?: number;
 } {
   let text = notes ?? "";
   let voice = voiceCol ?? undefined;
   let patientsCount: number | undefined;
   let bloodGroups: BloodGroup[] | undefined;
   let groupUnits: Partial<Record<BloodGroup, number>> | undefined;
+  let hospitalLat: number | undefined;
+  let hospitalLng: number | undefined;
 
   const voiceIdx = text.indexOf(VOICE_MARKER);
   if (voiceIdx !== -1) {
@@ -108,6 +126,8 @@ function splitVoiceFromNotes(
     patientsCount = meta.patientsCount;
     bloodGroups = meta.bloodGroups;
     groupUnits = meta.groupUnits;
+    hospitalLat = meta.hospitalLat;
+    hospitalLng = meta.hospitalLng;
     text = text.slice(0, needIdx);
   }
 
@@ -117,6 +137,8 @@ function splitVoiceFromNotes(
     patientsCount,
     bloodGroups,
     groupUnits,
+    hospitalLat,
+    hospitalLng,
   };
 }
 
@@ -124,16 +146,24 @@ function encodeNeedMeta(
   patientsCount?: number,
   bloodGroups?: BloodGroup[],
   groupUnits?: Partial<Record<BloodGroup, number>>,
+  hospitalLat?: number,
+  hospitalLng?: number,
 ) {
   const groups = bloodGroups?.length ? bloodGroups : undefined;
   const patients = patientsCount && patientsCount > 1 ? patientsCount : undefined;
   const unitsByGroup =
     groupUnits && Object.keys(groupUnits).length ? groupUnits : undefined;
-  if (!groups && !patients && !unitsByGroup) return "";
+  const hasGeo =
+    typeof hospitalLat === "number" &&
+    typeof hospitalLng === "number" &&
+    Number.isFinite(hospitalLat) &&
+    Number.isFinite(hospitalLng);
+  if (!groups && !patients && !unitsByGroup && !hasGeo) return "";
   return `${NEED_MARKER}${JSON.stringify({
     patients: patientsCount ?? 1,
     groups: bloodGroups ?? [],
     unitsByGroup: unitsByGroup ?? {},
+    ...(hasGeo ? { hLat: hospitalLat, hLng: hospitalLng } : {}),
   })}`;
 }
 
@@ -160,6 +190,14 @@ function mapRow(row: BloodRequestRow): BloodRequest {
     hospitalId: row.hospital_id,
     hospitalName: row.hospital_name,
     hospitalArea: row.hospital_area,
+    hospitalLat:
+      typeof row.hospital_lat === "number" && Number.isFinite(row.hospital_lat)
+        ? row.hospital_lat
+        : split.hospitalLat,
+    hospitalLng:
+      typeof row.hospital_lng === "number" && Number.isFinite(row.hospital_lng)
+        ? row.hospital_lng
+        : split.hospitalLng,
     contactName: row.contact_name,
     phone: row.phone ?? "",
     units: row.units,
@@ -312,6 +350,8 @@ export async function addLiveRequest(
     hospital_id: input.hospitalId,
     hospital_name: input.hospitalName,
     hospital_area: input.hospitalArea,
+    hospital_lat: input.hospitalLat ?? null,
+    hospital_lng: input.hospitalLng ?? null,
     contact_name: input.contactName,
     phone: input.phone,
     units: input.units,
@@ -334,10 +374,18 @@ export async function addLiveRequest(
 
   if (
     error &&
-    /voice_note_url|patients_count|blood_groups|group_units/i.test(error.message)
+    /voice_note_url|patients_count|blood_groups|group_units|hospital_lat|hospital_lng/i.test(
+      error.message,
+    )
   ) {
     const extras = [
-      encodeNeedMeta(input.patientsCount, input.bloodGroups, input.groupUnits),
+      encodeNeedMeta(
+        input.patientsCount,
+        input.bloodGroups,
+        input.groupUnits,
+        input.hospitalLat,
+        input.hospitalLng,
+      ),
       input.voiceNoteUrl ? `${VOICE_MARKER}${input.voiceNoteUrl}` : "",
     ]
       .filter(Boolean)

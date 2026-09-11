@@ -495,6 +495,8 @@ export function VoiceRequestAssistant({
           hospitalId: hospital.id,
           hospitalName: hospital.name,
           hospitalArea: `${hospital.area}, ${hospital.city}`,
+          hospitalLat: hospital.lat,
+          hospitalLng: hospital.lng,
           contactName: current.contactName.trim(),
           phone: `+91${current.phone}`,
           units,

@@ -47,6 +47,8 @@ export interface BloodRequest {
   hospitalId: string;
   hospitalName: string;
   hospitalArea: string;
+  hospitalLat?: number;
+  hospitalLng?: number;
   contactName: string;
   phone: string;
   units: number;
@@ -97,6 +99,8 @@ export interface DonorProfile {
   email?: string;
   city: string;
   area: string;
+  lat?: number;
+  lng?: number;
   available: boolean;
   lastDonation?: string;
   age?: number;

@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Check, MapPin, Phone, X } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { BloodGroupList } from "@/components/request-help/blood-group-mark";
 import { neededBloodGroups, totalUnits } from "@/lib/blood-compatibility";
-import { formatCountdown, remainingMs, canShareContactDetails } from "@/lib/donor-assignment";
-import { formatDistance } from "@/lib/geo";
+import {
+  formatCountdown,
+  remainingMs,
+  canShareContactDetails,
+} from "@/lib/donor-assignment";
+import { DEMO_HOSPITALS } from "@/data/demo";
+import { distanceKm, formatDistance, resolveHospitalCoords } from "@/lib/geo";
+import { useDonorLiveCoords } from "@/hooks/use-donor-live-coords";
 import { ContactPhone } from "@/components/request-help/contact-phone";
 import { VoiceNotePlayer } from "@/components/request-help/voice-note-player";
 import { WhatsAppConnectButton } from "@/components/request-help/whatsapp-connect-button";
@@ -17,13 +23,16 @@ export function AssignedRequesterDetails({
   onClose,
   onAccept,
   onDecline,
+  donorCoords,
 }: {
   request: BloodRequest;
   onClose: () => void;
   onAccept?: () => void;
   onDecline?: () => void;
+  donorCoords?: { lat?: number; lng?: number } | null;
 }) {
   const { t } = useLanguage();
+  const { coords: from } = useDonorLiveCoords(donorCoords);
   const assignment = request.assignment;
   const wait = remainingMs(assignment);
   const pending = assignment?.status === "pending" && Boolean(assignment.donorId);
@@ -36,6 +45,29 @@ export function AssignedRequesterDetails({
       : request.urgency === "urgent"
         ? t("urgency.urgent")
         : t("urgency.planned");
+
+  const hospital = useMemo(
+    () =>
+      resolveHospitalCoords({
+        hospitalId: request.hospitalId,
+        hospitalLat: request.hospitalLat,
+        hospitalLng: request.hospitalLng,
+        hospitals: DEMO_HOSPITALS,
+      }),
+    [request.hospitalId, request.hospitalLat, request.hospitalLng],
+  );
+
+  const liveDistanceKm = useMemo(() => {
+    if (!from || !hospital) return null;
+    return distanceKm(from.lat, from.lng, hospital.lat, hospital.lng);
+  }, [from?.lat, from?.lng, hospital?.lat, hospital?.lng]);
+
+  const distanceLabel =
+    liveDistanceKm != null
+      ? formatDistance(liveDistanceKm)
+      : typeof assignment?.distanceKm === "number"
+        ? formatDistance(assignment.distanceKm)
+        : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -78,9 +110,7 @@ export function AssignedRequesterDetails({
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">
           <BloodGroupList groups={groups} /> · {request.hospitalName}
-          {typeof request.distanceKm === "number"
-            ? ` · ${formatDistance(request.distanceKm)}`
-            : ""}
+          {distanceLabel ? ` · ${distanceLabel}` : ""}
         </p>
         <p className="mt-2 text-sm font-semibold text-crimson">
           {t("match.matchAlert")}
@@ -120,10 +150,7 @@ export function AssignedRequesterDetails({
               `${units} ${units > 1 ? t("live.units") : t("live.unit")}`,
             ],
             [t("live.status"), `${urgencyLabel} · ${request.status.replaceAll("_", " ")}`],
-            [
-              t("live.people"),
-              String(request.patientsCount ?? 1),
-            ],
+            [t("live.people"), String(request.patientsCount ?? 1)],
             pending
               ? [t("match.donorTimer"), formatCountdown(wait)]
               : [t("match.accepted"), t("match.searchFound")],

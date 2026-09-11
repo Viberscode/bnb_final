@@ -6,6 +6,7 @@ import {
   Droplets,
   Loader2,
   MapPin,
+  Navigation,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -17,6 +18,9 @@ import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { fetchDonorProfile, saveDonorProfile } from "@/lib/donor-profile";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { useLiveLocation } from "@/hooks/use-live-location";
+import { persistDonorCoords } from "@/hooks/use-donor-live-coords";
+import { reverseGeocode } from "@/lib/reverse-geocode";
 import { cn } from "@/lib/utils";
 import type { BloodGroup } from "@/types";
 
@@ -112,6 +116,7 @@ function StepPanel({
 export function BecomeDonorForm() {
   const { t, locale } = useLanguage();
   const { user, status } = useAuth();
+  const { coords, status: locStatus, retry: retryLocation } = useLiveLocation();
   const [fullName, setFullName] = useState("");
   const [bloodGroup, setBloodGroup] = useState<BloodGroup | null>(null);
   const [phone, setPhone] = useState("");
@@ -119,6 +124,10 @@ export function BecomeDonorForm() {
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
+  const [lat, setLat] = useState<number | undefined>();
+  const [lng, setLng] = useState<number | undefined>();
+  const [followLive, setFollowLive] = useState(true);
+  const [readingAddress, setReadingAddress] = useState(false);
   const [available, setAvailable] = useState(true);
   const [lastDonation, setLastDonation] = useState("");
   const [age, setAge] = useState("");
@@ -151,15 +160,36 @@ export function BecomeDonorForm() {
       setEmail(existing.email ?? "");
       setCity(existing.city);
       setArea(existing.area);
+      setLat(existing.lat);
+      setLng(existing.lng);
       setAvailable(existing.available);
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
       setNotes(existing.notes ?? "");
+      if (existing.city && existing.area) setFollowLive(false);
     })();
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!followLive || !coords) return;
+    let active = true;
+    setLat(coords.lat);
+    setLng(coords.lng);
+    setReadingAddress(true);
+    void reverseGeocode(coords.lat, coords.lng, locale).then((place) => {
+      if (!active) return;
+      setReadingAddress(false);
+      if (!place) return;
+      setCity(place.city);
+      setArea(place.area);
+    });
+    return () => {
+      active = false;
+    };
+  }, [coords?.lat, coords?.lng, followLive, locale]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -194,7 +224,11 @@ export function BecomeDonorForm() {
       return;
     }
     if (!city.trim() || !area.trim()) {
-      setError(t("donor.errCity"));
+      setError(
+        locStatus === "denied" || locStatus === "unavailable"
+          ? t("donor.errLocation")
+          : t("donor.errCity"),
+      );
       return;
     }
     if (!isEdit && !kycVerified) {
@@ -211,11 +245,16 @@ export function BecomeDonorForm() {
         email,
         city,
         area,
+        lat,
+        lng,
         available,
         lastDonation: lastDonation || undefined,
         age: age ? Number(age) : undefined,
         notes,
       });
+      if (typeof lat === "number" && typeof lng === "number") {
+        persistDonorCoords(lat, lng);
+      }
       const rawNext = new URLSearchParams(window.location.search).get("next");
       const next =
         rawNext &&
@@ -422,7 +461,64 @@ export function BecomeDonorForm() {
         icon={MapPin}
         delayMs={340}
       >
-        <p className="mb-3 text-sm text-ink-muted">{t("donor.locationManualHint")}</p>
+        <p className="mb-3 text-sm text-ink-muted">
+          {followLive ? t("donor.liveArea") : t("donor.locationManualHint")}
+        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFollowLive(true);
+              retryLocation();
+            }}
+            className={cn(
+              "inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold transition",
+              followLive
+                ? "bg-teal text-white"
+                : "border border-line bg-white text-ink hover:bg-black/[0.03]",
+            )}
+          >
+            <Navigation className="size-3.5" aria-hidden />
+            {t("donor.followLive")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFollowLive(false)}
+            className={cn(
+              "inline-flex h-10 items-center rounded-xl px-3.5 text-sm font-bold transition",
+              !followLive
+                ? "bg-slate-800 text-white"
+                : "border border-line bg-white text-ink hover:bg-black/[0.03]",
+            )}
+          >
+            {t("donor.city")} / {t("donor.area")}
+          </button>
+          {followLive && locStatus === "loading" ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              {t("donor.gettingLocation")}
+            </span>
+          ) : null}
+          {followLive && readingAddress ? (
+            <span className="text-xs font-semibold text-ink-muted">
+              {t("donor.readingAddress")}
+            </span>
+          ) : null}
+          {followLive && coords ? (
+            <span className="text-xs font-semibold text-teal-deep">
+              {t("donor.gpsAccuracy", { m: Math.round(coords.accuracy) })}
+            </span>
+          ) : null}
+          {followLive && (locStatus === "denied" || locStatus === "unavailable") ? (
+            <button
+              type="button"
+              onClick={retryLocation}
+              className="text-xs font-bold text-crimson underline-offset-2 hover:underline"
+            >
+              {t("donor.errLocation")}
+            </button>
+          ) : null}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-bold text-ink">
@@ -430,7 +526,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={city}
-              onChange={(e) => setCity(e.target.value)}
+              onChange={(e) => {
+                setFollowLive(false);
+                setCity(e.target.value);
+              }}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="New Delhi"
               autoComplete="address-level2"
@@ -443,7 +542,10 @@ export function BecomeDonorForm() {
             </span>
             <input
               value={area}
-              onChange={(e) => setArea(e.target.value)}
+              onChange={(e) => {
+                setFollowLive(false);
+                setArea(e.target.value);
+              }}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 text-ink shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300/40"
               placeholder="Saket / Dwarka / …"
               autoComplete="address-level3"

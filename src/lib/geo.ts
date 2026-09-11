@@ -16,6 +16,7 @@ export function distanceKm(
 }
 
 export function formatDistance(km: number): string {
+  if (!Number.isFinite(km) || km < 0) return "—";
   if (km < 1) return `${Math.round(km * 1000)} m`;
   return `${km.toFixed(1)} km`;
 }
@@ -44,4 +45,23 @@ export function getNearbyPlaces<T extends { lat: number; lng: number }>(
     .filter((place) => place.distanceKm <= maxRadiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm)
     .slice(0, limit);
+}
+
+export function resolveHospitalCoords(input: {
+  hospitalId?: string;
+  hospitalLat?: number | null;
+  hospitalLng?: number | null;
+  hospitals?: Array<{ id: string; lat: number; lng: number }>;
+}): { lat: number; lng: number } | null {
+  if (
+    typeof input.hospitalLat === "number" &&
+    typeof input.hospitalLng === "number" &&
+    Number.isFinite(input.hospitalLat) &&
+    Number.isFinite(input.hospitalLng)
+  ) {
+    return { lat: input.hospitalLat, lng: input.hospitalLng };
+  }
+  const hit = input.hospitals?.find((item) => item.id === input.hospitalId);
+  if (hit) return { lat: hit.lat, lng: hit.lng };
+  return null;
 }

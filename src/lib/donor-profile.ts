@@ -14,6 +14,8 @@ type DonorRow = {
   email: string | null;
   city: string;
   area: string;
+  lat?: number | null;
+  lng?: number | null;
   available: boolean;
   last_donation: string | null;
   age: number | null;
@@ -36,6 +38,10 @@ function mapRow(row: DonorRow): DonorProfile {
     email: row.email ?? undefined,
     city: row.city,
     area: row.area,
+    lat:
+      typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : undefined,
+    lng:
+      typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : undefined,
     available: row.available,
     lastDonation: row.last_donation ?? undefined,
     age: row.age ?? undefined,
@@ -176,6 +182,14 @@ export async function saveDonorProfile(
     email: input.email?.trim() || user.email || null,
     city: input.city.trim(),
     area: input.area.trim(),
+    lat:
+      typeof input.lat === "number" && Number.isFinite(input.lat)
+        ? input.lat
+        : null,
+    lng:
+      typeof input.lng === "number" && Number.isFinite(input.lng)
+        ? input.lng
+        : null,
     available: input.available,
     last_donation: input.lastDonation || null,
     age: input.age ?? null,
@@ -188,11 +202,22 @@ export async function saveDonorProfile(
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("donor_profiles")
     .upsert(payload, { onConflict: "id" })
     .select("*")
     .single();
+
+  if (error && /lat|lng/i.test(error.message)) {
+    const { lat: _lat, lng: _lng, ...withoutCoords } = payload;
+    const retry = await supabase
+      .from("donor_profiles")
+      .upsert(withoutCoords, { onConflict: "id" })
+      .select("*")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     throw new Error(error?.message || "Could not save donor profile.");

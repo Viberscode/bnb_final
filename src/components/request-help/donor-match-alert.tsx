@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AssignedRequesterDetails } from "@/components/request-help/assigned-requester-details";
+import { useDonorLiveCoords } from "@/hooks/use-donor-live-coords";
 import {
   isAssignedDonor,
   isOwnDonor,
@@ -39,6 +40,7 @@ export function DonorMatchAlert() {
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const { coords: liveCoords } = useDonorLiveCoords(donor);
 
   const pool = useMemo(() => {
     if (!donor) return donors;
@@ -131,6 +133,10 @@ export function DonorMatchAlert() {
   return (
     <AssignedRequesterDetails
       request={openRequest}
+      donorCoords={{
+        lat: liveCoords?.lat ?? donor.lat,
+        lng: liveCoords?.lng ?? donor.lng,
+      }}
       onClose={() => {
         rememberDismissed(openKey);
         setOpenKey(null);

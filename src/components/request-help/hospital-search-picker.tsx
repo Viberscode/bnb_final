@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Hospital as HospitalIcon, Loader2, MapPin, Navigation, Plus } from "lucide-react";
+import { Hospital as HospitalIcon, Loader2, MapPin, Navigation } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import {
+  HOSPITAL_MAP_DEFAULT_CENTER,
+  HospitalLiveMap,
+} from "@/components/request-help/hospital-live-map";
 import { DEMO_HOSPITALS } from "@/data/demo";
 import { distanceKm, formatDistance } from "@/lib/geo";
 import { cn } from "@/lib/utils";
@@ -39,43 +43,6 @@ function withDistance(
   };
 }
 
-/** Default overview: Rohini Sector 9 / West metro — hospital icons visible on OSM. */
-const DEFAULT_MAP_CENTER = { lat: 28.7165, lng: 77.1178 };
-const MAP_PAD_LAT = 0.0085;
-const MAP_PAD_LNG = 0.011;
-
-function osmEmbedUrl(lat: number, lng: number) {
-  const left = lng - MAP_PAD_LNG;
-  const right = lng + MAP_PAD_LNG;
-  const top = lat + MAP_PAD_LAT;
-  const bottom = lat - MAP_PAD_LAT;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
-}
-
-function projectToPercent(
-  lat: number,
-  lng: number,
-  center: { lat: number; lng: number },
-) {
-  const left = center.lng - MAP_PAD_LNG;
-  const right = center.lng + MAP_PAD_LNG;
-  const top = center.lat + MAP_PAD_LAT;
-  const bottom = center.lat - MAP_PAD_LAT;
-  const x = ((lng - left) / (right - left)) * 100;
-  const y = ((top - lat) / (top - bottom)) * 100;
-  return { x, y };
-}
-
-function inViewport(
-  hospital: Hospital,
-  center: { lat: number; lng: number },
-) {
-  return (
-    Math.abs(hospital.lat - center.lat) <= MAP_PAD_LAT &&
-    Math.abs(hospital.lng - center.lng) <= MAP_PAD_LNG
-  );
-}
-
 export function HospitalSearchPicker({
   value,
   onChange,
@@ -100,13 +67,12 @@ export function HospitalSearchPicker({
     ? { lat: mapHospital.lat, lng: mapHospital.lng }
     : userCoords
       ? { lat: userCoords.lat, lng: userCoords.lng }
-      : DEFAULT_MAP_CENTER;
+      : HOSPITAL_MAP_DEFAULT_CENTER;
 
   useEffect(() => {
     if (value?.name && value.name !== query) {
       setQuery(value.name);
     }
-    // Only sync when an external selection changes the hospital id/name.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value?.id, value?.name]);
 
@@ -171,8 +137,9 @@ export function HospitalSearchPicker({
     let active = true;
     setMapLoading(true);
 
-    const local = DEMO_HOSPITALS.filter((hospital) =>
-      inViewport(hospital, mapCenter),
+    const local = DEMO_HOSPITALS.filter(
+      (hospital) =>
+        distanceKm(mapCenter.lat, mapCenter.lng, hospital.lat, hospital.lng) <= 8,
     ).map((item) => withDistance(item, userCoords ?? mapCenter));
 
     setMapPins(local);
@@ -180,14 +147,14 @@ export function HospitalSearchPicker({
     void (async () => {
       try {
         const res = await fetch(
-          `/api/hospitals/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radiusKm=3`,
+          `/api/hospitals/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radiusKm=5`,
           { signal: controller.signal },
         );
         if (!res.ok || !active) return;
         const data = (await res.json()) as { hospitals?: Hospital[] };
-        const remote = (data.hospitals ?? [])
-          .filter((hospital) => inViewport(hospital, mapCenter))
-          .map((item) => withDistance(item, userCoords ?? mapCenter));
+        const remote = (data.hospitals ?? []).map((item) =>
+          withDistance(item, userCoords ?? mapCenter),
+        );
         const seen = new Set(local.map((item) => normalize(item.name)));
         const merged = [...local];
         for (const item of remote) {
@@ -223,9 +190,11 @@ export function HospitalSearchPicker({
     setOpen(false);
     if (fromMap) {
       setFillFlash(true);
-      wrapRef.current
-        ?.querySelector<HTMLInputElement>("#hospital-name-input")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.requestAnimationFrame(() => {
+        wrapRef.current
+          ?.querySelector<HTMLInputElement>("#hospital-name-input")
+          ?.focus({ preventScroll: true });
+      });
     }
   }
 
@@ -336,57 +305,12 @@ export function HospitalSearchPicker({
           )}
         </div>
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#e8f4f2]">
-          <iframe
-            key={`${mapCenter.lat.toFixed(5)},${mapCenter.lng.toFixed(5)},${mapHospital?.id ?? "default"}`}
-            title={t("request.hospitalMap")}
-            src={osmEmbedUrl(mapCenter.lat, mapCenter.lng)}
-            className="pointer-events-none absolute inset-x-0 top-0 h-[calc(100%+2.75rem)] w-full border-0"
-            loading="eager"
-            referrerPolicy="no-referrer-when-downgrade"
-            tabIndex={-1}
-            aria-hidden
+          <HospitalLiveMap
+            center={mapCenter}
+            hospitals={mapPins}
+            selectedId={value?.id}
+            onSelect={(hospital) => pick(hospital, true)}
           />
-
-          {/* Clickable hospital pins aligned to the fixed map bbox */}
-          <div className="absolute inset-0 z-10">
-            {mapPins.map((hospital) => {
-              const pos = projectToPercent(hospital.lat, hospital.lng, mapCenter);
-              if (pos.x < 2 || pos.x > 98 || pos.y < 4 || pos.y > 96) return null;
-              const selected = value?.id === hospital.id;
-              return (
-                <button
-                  key={hospital.id}
-                  type="button"
-                  title={hospital.name}
-                  aria-label={hospital.name}
-                  onClick={() => pick(hospital, true)}
-                  style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                  className={cn(
-                    "group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center",
-                    selected && "z-20",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex size-8 items-center justify-center rounded-full border-2 border-white text-white shadow-[0_8px_18px_-6px_rgba(196,18,47,0.85)] transition group-hover:scale-110",
-                      selected
-                        ? "bg-[#0d7370] ring-2 ring-[#0d7370]/35"
-                        : "bg-[#c4122f]",
-                    )}
-                  >
-                    <Plus className="size-4" strokeWidth={3} aria-hidden />
-                  </span>
-                  <span className="mt-1 max-w-[7.5rem] truncate rounded-md bg-white/95 px-1.5 py-0.5 text-[0.6rem] font-bold text-ink opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100">
-                    {hospital.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="pointer-events-none absolute bottom-1.5 right-2 z-20 rounded bg-white/85 px-1.5 py-0.5 text-[0.6rem] font-medium text-ink-muted">
-            © OpenStreetMap
-          </p>
         </div>
       </div>
     </div>

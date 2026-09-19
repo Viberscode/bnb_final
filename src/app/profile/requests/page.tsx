@@ -11,12 +11,13 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { useAssignmentEngine } from "@/hooks/use-assignment-engine";
 import { startAssignmentForRequest, waitForAnotherDonor, withAssignments } from "@/lib/donor-assignment";
-import { fetchAvailableDonors } from "@/lib/donor-profile";
+import { fetchAvailableDonorsPage } from "@/lib/donor-profile";
 import {
   completeLiveRequest,
-  fetchMyLiveRequests,
+  fetchMyLiveRequestsPage,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
+import { MATCH_DONOR_LIMIT, MY_REQUEST_PAGE_SIZE, mergeUniqueById } from "@/lib/pagination";
 import type { BloodRequest, DonorProfile } from "@/types";
 
 export default function MyRequestsPage() {
@@ -24,6 +25,8 @@ export default function MyRequestsPage() {
   const { t } = useLanguage();
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
   const [donors, setDonors] = useState<DonorProfile[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [ready, setReady] = useState(false);
   const [watchId, setWatchId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
@@ -67,13 +70,14 @@ export default function MyRequestsPage() {
     let active = true;
 
     const refresh = async () => {
-      const [next, nextDonors] = await Promise.all([
-        fetchMyLiveRequests(user?.id),
-        fetchAvailableDonors(),
+      const [page, donorPage] = await Promise.all([
+        fetchMyLiveRequestsPage(user?.id, 0, MY_REQUEST_PAGE_SIZE),
+        fetchAvailableDonorsPage(0, MATCH_DONOR_LIMIT),
       ]);
       if (!active) return;
-      setMyRequests(next);
-      setDonors(nextDonors);
+      setMyRequests(page.items);
+      setHasMore(page.hasMore);
+      setDonors(donorPage.items);
       setReady(true);
     };
 
@@ -181,21 +185,56 @@ export default function MyRequestsPage() {
                         onConfirmSolved={() => {
                           setCompletingId(request.id);
                           void completeLiveRequest(request.id)
-                            .then(() => fetchMyLiveRequests(user.id))
-                            .then((next) => setMyRequests(next))
+                            .then(() =>
+                              fetchMyLiveRequestsPage(user.id, 0, MY_REQUEST_PAGE_SIZE),
+                            )
+                            .then((page) => {
+                              setMyRequests(page.items);
+                              setHasMore(page.hasMore);
+                            })
                             .finally(() => setCompletingId(null));
                         }}
                         onWaitMore={() => {
                           setWaitingId(request.id);
                           void waitForAnotherDonor(request.id)
                             .then(() => startAssignmentForRequest(request, otherDonors))
-                            .then(() => fetchMyLiveRequests(user.id))
-                            .then((next) => setMyRequests(next))
+                            .then(() =>
+                              fetchMyLiveRequestsPage(user.id, 0, MY_REQUEST_PAGE_SIZE),
+                            )
+                            .then((page) => {
+                              setMyRequests(page.items);
+                              setHasMore(page.hasMore);
+                            })
                             .finally(() => setWaitingId(null));
                         }}
                       />
                     ))
                   )}
+                  {hasMore ? (
+                    <button
+                      type="button"
+                      disabled={loadingMore}
+                      onClick={() => {
+                        if (!user?.id) return;
+                        setLoadingMore(true);
+                        void fetchMyLiveRequestsPage(
+                          user.id,
+                          myRequests.length,
+                          MY_REQUEST_PAGE_SIZE,
+                        )
+                          .then((page) => {
+                            setMyRequests((prev) =>
+                              mergeUniqueById(prev, page.items),
+                            );
+                            setHasMore(page.hasMore);
+                          })
+                          .finally(() => setLoadingMore(false));
+                      }}
+                      className="flex h-11 w-full items-center justify-center rounded-2xl border border-line bg-white text-sm font-bold text-ink hover:bg-black/[0.02] disabled:opacity-60"
+                    >
+                      {loadingMore ? t("profile.loadingMore") : t("profile.loadMore")}
+                    </button>
+                  ) : null}
                 </div>
               </section>
             </div>

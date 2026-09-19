@@ -42,13 +42,17 @@ import {
   startAssignmentForRequest,
   withAssignments,
 } from "@/lib/donor-assignment";
-import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
+import {
+  fetchAvailableDonorsPage,
+  fetchDonorProfile,
+} from "@/lib/donor-profile";
 import {
   completeLiveRequest,
-  fetchLiveRequests,
+  fetchLiveRequestsPage,
   subscribeLiveRequests,
   urgencyRank,
 } from "@/lib/live-requests";
+import { LIVE_REQUEST_PAGE_SIZE, MATCH_DONOR_LIMIT, mergeUniqueById } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import type { BloodRequest, DonorProfile, UrgencyLevel } from "@/types";
 
@@ -590,6 +594,8 @@ export function LiveRequests({
   const { user } = useAuth();
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [donors, setDonors] = useState<DonorProfile[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openRequest, setOpenRequest] = useState<BloodRequest | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -618,15 +624,16 @@ export function LiveRequests({
   useEffect(() => {
     let active = true;
     const refresh = async () => {
-      const [rows, profile, nextDonors] = await Promise.all([
-        fetchLiveRequests(),
+      const [page, profile, donorPage] = await Promise.all([
+        fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE),
         fetchDonorProfile(user?.id),
-        fetchAvailableDonors(),
+        fetchAvailableDonorsPage(0, MATCH_DONOR_LIMIT),
       ]);
       if (!active) return;
-      setRequests(rows);
+      setRequests(page.items);
+      setHasMore(page.hasMore);
       setDonor(profile);
-      setDonors(nextDonors);
+      setDonors(donorPage.items);
     };
     void refresh();
     const unsubscribe = subscribeLiveRequests(() => {
@@ -806,8 +813,11 @@ export function LiveRequests({
                   ? () => {
                       setConfirmingId(request.id);
                       void completeLiveRequest(request.id)
-                        .then(() => fetchLiveRequests())
-                        .then(setRequests)
+                        .then(() => fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE))
+                        .then((page) => {
+                          setRequests(page.items);
+                          setHasMore(page.hasMore);
+                        })
                         .finally(() => setConfirmingId(null));
                     }
                   : undefined
@@ -818,8 +828,11 @@ export function LiveRequests({
                       setWaitingId(request.id);
                       void waitForAnotherDonor(request.id)
                         .then(() => startAssignmentForRequest(request, pool))
-                        .then(() => fetchLiveRequests())
-                        .then(setRequests)
+                        .then(() => fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE))
+                        .then((page) => {
+                          setRequests(page.items);
+                          setHasMore(page.hasMore);
+                        })
                         .finally(() => setWaitingId(null));
                     }
                   : undefined
@@ -834,6 +847,27 @@ export function LiveRequests({
             />
           ))}
         </div>
+
+        {typeof limit !== "number" && hasMore ? (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => {
+                setLoadingMore(true);
+                void fetchLiveRequestsPage(requests.length, LIVE_REQUEST_PAGE_SIZE)
+                  .then((page) => {
+                    setRequests((prev) => mergeUniqueById(prev, page.items));
+                    setHasMore(page.hasMore);
+                  })
+                  .finally(() => setLoadingMore(false));
+              }}
+              className="inline-flex h-11 items-center rounded-2xl border border-line bg-white px-5 text-sm font-bold text-ink hover:bg-black/[0.02] disabled:opacity-60"
+            >
+              {loadingMore ? t("live.loadingMore") : t("live.loadMore")}
+            </button>
+          </div>
+        ) : null}
 
         {visible.length === 0 ? (
           <p className="mt-8 rounded-2xl border border-dashed border-line bg-white/70 px-6 py-12 text-center text-ink-muted">
@@ -880,7 +914,10 @@ export function LiveRequests({
                 donor.id,
                 "accept",
                 openRequest.userId,
-              ).then(() => fetchLiveRequests()).then(setRequests);
+              ).then(() => fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE)).then((page) => {
+                setRequests(page.items);
+                setHasMore(page.hasMore);
+              });
             }}
             onDecline={() => {
               setOpenRequest(null);
@@ -889,7 +926,10 @@ export function LiveRequests({
                 donor.id,
                 "decline",
                 openRequest.userId,
-              ).then(() => fetchLiveRequests()).then(setRequests);
+              ).then(() => fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE)).then((page) => {
+                setRequests(page.items);
+                setHasMore(page.hasMore);
+              });
             }}
           />
         ) : (

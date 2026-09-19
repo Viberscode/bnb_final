@@ -20,7 +20,7 @@ import {
   subscribeDonorProfile,
 } from "@/lib/donor-profile";
 import {
-  fetchMyLiveRequests,
+  fetchMyLiveRequestCount,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
 import type { DonorProfile, NgoProfile } from "@/types";
@@ -125,14 +125,14 @@ export default function ProfilePage() {
     let active = true;
 
     const refresh = async () => {
-      const [nextProfile, myRequests, nextNgo] = await Promise.all([
+      const [nextProfile, requestCount, nextNgo] = await Promise.all([
         fetchDonorProfile(user?.id),
-        fetchMyLiveRequests(user?.id),
+        fetchMyLiveRequestCount(user?.id),
         fetchNgoProfile(user?.id),
       ]);
       if (!active) return;
       setProfile(nextProfile);
-      setRequestCount(myRequests.length);
+      setRequestCount(requestCount);
       setNgo(nextNgo);
       setReady(true);
     };

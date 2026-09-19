@@ -291,7 +291,10 @@ function readMergedStore(): AssignmentStore {
   return { ...readStore(), ...remoteCache };
 }
 
-async function fetchRemoteStore(force = false): Promise<AssignmentStore> {
+async function fetchRemoteStore(
+  force = false,
+  requestIds?: string[],
+): Promise<AssignmentStore> {
   if (!canUseRemoteAssignments()) return remoteCache;
   const supabase = tryCreateClient();
   if (!supabase || !isSupabaseConfigured()) return remoteCache;
@@ -300,8 +303,20 @@ async function fetchRemoteStore(force = false): Promise<AssignmentStore> {
     return remoteCache;
   }
 
+  const ids = [...new Set((requestIds ?? []).filter(Boolean))].slice(0, 40);
+
   remoteFetchInFlight = (async () => {
-    const { data, error } = await supabase.from("request_assignments").select("*");
+    const ASSIGNMENT_COLUMNS =
+      "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids, eligible_donor_ids";
+    let query = supabase
+      .from("request_assignments")
+      .select(ASSIGNMENT_COLUMNS);
+    if (ids.length) {
+      query = query.in("request_id", ids);
+    }
+    const { data, error } = await query
+      .order("updated_at", { ascending: false })
+      .limit(80);
     lastRemoteFetchAt = Date.now();
     if (error) {
       if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
@@ -309,7 +324,7 @@ async function fetchRemoteStore(force = false): Promise<AssignmentStore> {
     }
     remoteAssignmentsReady = true;
     remoteUnavailableUntil = 0;
-    const next: AssignmentStore = {};
+    const next: AssignmentStore = ids.length ? { ...remoteCache } : {};
     for (const row of (data ?? []) as Record<string, unknown>[]) {
       const requestId = String(row.request_id ?? "");
       const assignment = toAssignment(row);
@@ -581,7 +596,10 @@ export async function syncAssignments(
 ): Promise<BloodRequest[]> {
   const allowCreate = options?.allowCreate !== false;
   const local = readStore();
-  const remote = await fetchRemoteStore(true);
+  const remote = await fetchRemoteStore(
+    true,
+    requests.map((request) => request.id),
+  );
   const store: AssignmentStore = { ...local, ...remote };
   let changed = false;
 

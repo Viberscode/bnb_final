@@ -1,6 +1,15 @@
 import type { BloodRequest, RequestStatus, UrgencyLevel, BloodGroup } from "@/types";
 import { BLOOD_GROUPS } from "@/lib/blood-compatibility";
 import { createdAfterReset } from "@/lib/data-reset";
+import {
+  LIVE_REQUEST_PAGE_SIZE,
+  MY_REQUEST_PAGE_SIZE,
+  emptyPage,
+  pageFromRows,
+  parsePageParams,
+  type PageParams,
+  type PageResult,
+} from "@/lib/pagination";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -213,12 +222,6 @@ function mapRow(row: BloodRequestRow): BloodRequest {
   };
 }
 
-export function urgencyRank(urgency: BloodRequest["urgency"]): number {
-  if (urgency === "critical") return 0;
-  if (urgency === "urgent") return 1;
-  return 2;
-}
-
 /** Statuses that still count as an open request (one per user). */
 export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
   "pending",
@@ -227,64 +230,183 @@ export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
   "donor_enroute",
 ];
 
-/** Fetch live requests from Supabase (last 24 hours only). */
-export async function fetchLiveRequests(): Promise<BloodRequest[]> {
-  const supabase = tryCreateClient();
-  if (!supabase || !isSupabaseConfigured()) {
-    return [];
-  }
-
-  const since = new Date(Date.now() - LIVE_REQUEST_MAX_AGE_MS).toISOString();
-
-  const { data, error } = await supabase
-    .from("blood_requests")
-    .select("*")
-    .in("status", [...ACTIVE_REQUEST_STATUSES, "completed"])
-    .gte("created_at", since)
-    .order("created_at", { ascending: false });
-
-  if (error || !data) {
-    console.warn("Supabase blood_requests fetch failed:", error?.message);
-    return [];
-  }
-
-  const now = Date.now();
-  return (data as BloodRequestRow[])
-    .map(mapRow)
-    .filter(
-      (request) =>
-        createdAfterReset(request.createdAt) &&
-        isWithinLiveWindow(request.createdAt, now),
-    );
-}
-
 export function isActiveRequestStatus(status: RequestStatus): boolean {
   return ACTIVE_REQUEST_STATUSES.includes(status);
 }
 
-/** Fetch live requests created by the signed-in user. */
+const BLOOD_REQUEST_COLUMNS =
+  "id, user_id, blood_group, urgency, hospital_id, hospital_name, hospital_area, hospital_lat, hospital_lng, contact_name, phone, units, notes, voice_note_url, patients_count, blood_groups, group_units, status, distance_km, created_at";
+
+type QueryClient = {
+  from: (table: string) => any;
+};
+
+export function parseLivePage(searchParams: URLSearchParams) {
+  return parsePageParams(searchParams, LIVE_REQUEST_PAGE_SIZE);
+}
+
+export function parseMinePage(searchParams: URLSearchParams) {
+  return parsePageParams(searchParams, MY_REQUEST_PAGE_SIZE);
+}
+
+export async function queryLiveRequestPage(
+  supabase: QueryClient,
+  params: PageParams,
+): Promise<PageResult<BloodRequest>> {
+  const since = new Date(Date.now() - LIVE_REQUEST_MAX_AGE_MS).toISOString();
+  const to = params.offset + params.limit - 1;
+  const { data, error, count } = await supabase
+    .from("blood_requests")
+    .select(BLOOD_REQUEST_COLUMNS, { count: "exact" })
+    .in("status", [...ACTIVE_REQUEST_STATUSES, "completed"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .range(params.offset, to);
+
+  if (error) {
+    console.warn("Supabase blood_requests page failed:", error.message);
+    return emptyPage(params.offset, params.limit);
+  }
+
+  const rows = (data as BloodRequestRow[] | null) ?? [];
+  const mapped = rows
+    .map(mapRow)
+    .filter((request) => createdAfterReset(request.createdAt));
+  return pageFromRows(mapped, params, count ?? null);
+}
+
+export async function queryMyRequestPage(
+  supabase: QueryClient,
+  userId: string,
+  params: PageParams,
+): Promise<PageResult<BloodRequest>> {
+  const to = params.offset + params.limit - 1;
+  const { data, error, count } = await supabase
+    .from("blood_requests")
+    .select(BLOOD_REQUEST_COLUMNS, { count: "exact" })
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(params.offset, to);
+
+  if (error) {
+    console.warn("Supabase my blood_requests page failed:", error.message);
+    return emptyPage(params.offset, params.limit);
+  }
+
+  const mapped = ((data as BloodRequestRow[] | null) ?? [])
+    .map(mapRow)
+    .filter((request) => createdAfterReset(request.createdAt));
+  return pageFromRows(mapped, params, count ?? null);
+}
+
+export async function queryMyRequestCount(
+  supabase: QueryClient,
+  userId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("blood_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
+export async function queryActiveRequestForUser(
+  supabase: QueryClient,
+  userId: string,
+): Promise<BloodRequest | null> {
+  const { data, error } = await supabase
+    .from("blood_requests")
+    .select(BLOOD_REQUEST_COLUMNS)
+    .eq("user_id", userId)
+    .in("status", ACTIVE_REQUEST_STATUSES)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const request = mapRow(data as BloodRequestRow);
+  return createdAfterReset(request.createdAt) ? request : null;
+}
+
+async function fetchJsonPage<T>(
+  url: string,
+  fallback: () => Promise<PageResult<T>>,
+): Promise<PageResult<T>> {
+  try {
+    const res = await fetch(url, { cache: "no-store", credentials: "include" });
+    if (!res.ok) return fallback();
+    const body = (await res.json()) as PageResult<T>;
+    if (!Array.isArray(body.items)) return fallback();
+    return body;
+  } catch {
+    return fallback();
+  }
+}
+
+export function urgencyRank(urgency: BloodRequest["urgency"]): number {
+  if (urgency === "critical") return 0;
+  if (urgency === "urgent") return 1;
+  return 2;
+}
+
+export async function fetchLiveRequestsPage(
+  offset = 0,
+  limit = LIVE_REQUEST_PAGE_SIZE,
+): Promise<PageResult<BloodRequest>> {
+  const params = { offset, limit };
+  return fetchJsonPage(`/api/requests/live?offset=${offset}&limit=${limit}`, async () => {
+    const supabase = tryCreateClient();
+    if (!supabase || !isSupabaseConfigured()) return emptyPage(offset, limit);
+    return queryLiveRequestPage(supabase, params);
+  });
+}
+
+/** First page of the public live feed (last 24 hours). */
+export async function fetchLiveRequests(): Promise<BloodRequest[]> {
+  const page = await fetchLiveRequestsPage(0, LIVE_REQUEST_PAGE_SIZE);
+  return page.items;
+}
+
+export async function fetchMyLiveRequestsPage(
+  userId?: string,
+  offset = 0,
+  limit = MY_REQUEST_PAGE_SIZE,
+): Promise<PageResult<BloodRequest>> {
+  if (!userId) return emptyPage(offset, limit);
+  return fetchJsonPage(`/api/requests/mine?offset=${offset}&limit=${limit}`, async () => {
+    const supabase = tryCreateClient();
+    if (!supabase || !isSupabaseConfigured()) return emptyPage(offset, limit);
+    return queryMyRequestPage(supabase, userId, { offset, limit });
+  });
+}
+
+/** First page of the signed-in user's requests. */
 export async function fetchMyLiveRequests(
   userId?: string,
 ): Promise<BloodRequest[]> {
-  if (!userId) return [];
+  const page = await fetchMyLiveRequestsPage(userId, 0, MY_REQUEST_PAGE_SIZE);
+  return page.items;
+}
 
-  const supabase = tryCreateClient();
-  if (!supabase || !isSupabaseConfigured()) return [];
-
-  const { data, error } = await supabase
-    .from("blood_requests")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error || !data) {
-    console.warn("Supabase my blood_requests fetch failed:", error?.message);
-    return [];
+export async function fetchMyLiveRequestCount(userId?: string): Promise<number> {
+  if (!userId) return 0;
+  try {
+    const res = await fetch("/api/requests/mine?countOnly=1", {
+      cache: "no-store",
+      credentials: "include",
+    });
+    if (res.ok) {
+      const body = (await res.json()) as { total?: number };
+      if (typeof body.total === "number") return body.total;
+    }
+  } catch {
+    /* fall through */
   }
-
-  return (data as BloodRequestRow[])
-    .map(mapRow)
-    .filter((request) => createdAfterReset(request.createdAt));
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return 0;
+  return queryMyRequestCount(supabase, userId);
 }
 
 /** Fetch one request by id (live or closed) so invite links can resolve. */
@@ -299,7 +421,7 @@ export async function fetchRequestById(
 
   const { data, error } = await supabase
     .from("blood_requests")
-    .select("*")
+    .select(BLOOD_REQUEST_COLUMNS)
     .eq("id", id)
     .maybeSingle();
 
@@ -314,8 +436,58 @@ export async function fetchActiveRequestForUser(
 ): Promise<BloodRequest | null> {
   if (!userId) return null;
 
-  const mine = await fetchMyLiveRequests(userId);
-  return mine.find((r) => isActiveRequestStatus(r.status)) ?? null;
+  try {
+    const res = await fetch("/api/requests/mine?active=1", {
+      cache: "no-store",
+      credentials: "include",
+    });
+    if (res.ok) {
+      const body = (await res.json()) as { item?: BloodRequest | null };
+      if (body.item) return body.item;
+      if (body.item === null) return null;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return null;
+  return queryActiveRequestForUser(supabase, userId);
+}
+
+export async function fetchRequestsAssignedToDonor(
+  donorId?: string,
+): Promise<BloodRequest[]> {
+  if (!donorId) return [];
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return [];
+
+  const { data: rows, error } = await supabase
+    .from("request_assignments")
+    .select("request_id")
+    .eq("donor_id", donorId)
+    .in("status", ["pending", "accepted"])
+    .limit(12);
+
+  if (error || !rows?.length) return [];
+  const ids = [
+    ...new Set(
+      rows
+        .map((row) => String((row as { request_id?: string }).request_id ?? ""))
+        .filter(Boolean),
+    ),
+  ];
+  if (!ids.length) return [];
+
+  const { data, error: requestError } = await supabase
+    .from("blood_requests")
+    .select(BLOOD_REQUEST_COLUMNS)
+    .in("id", ids);
+
+  if (requestError || !data) return [];
+  return (data as BloodRequestRow[])
+    .map(mapRow)
+    .filter((request) => createdAfterReset(request.createdAt));
 }
 
 export async function addLiveRequest(

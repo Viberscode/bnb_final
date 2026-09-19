@@ -14,6 +14,7 @@ import {
 import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
+  fetchRequestsAssignedToDonor,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
 import type { BloodRequest, DonorProfile } from "@/types";
@@ -72,12 +73,17 @@ export function DonorMatchAlert() {
         return;
       }
 
-      const [rows, profile, nextDonors] = await Promise.all([
+      const [assignedRows, liveRows, profile, nextDonors] = await Promise.all([
+        fetchRequestsAssignedToDonor(user.id),
         fetchLiveRequests(),
         fetchDonorProfile(user.id),
         fetchAvailableDonors(),
       ]);
       if (!active) return;
+
+      const byId = new Map<string, BloodRequest>();
+      for (const row of [...assignedRows, ...liveRows]) byId.set(row.id, row);
+      const rows = [...byId.values()];
 
       const nextPool =
         profile && !nextDonors.some((item) => item.id === profile.id)

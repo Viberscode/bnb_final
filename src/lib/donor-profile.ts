@@ -1,5 +1,12 @@
 import type { BloodGroup, DonorProfile } from "@/types";
 import { createdAfterReset } from "@/lib/data-reset";
+import {
+  AVAILABLE_DONOR_PAGE_SIZE,
+  MATCH_DONOR_LIMIT,
+  emptyPage,
+  pageFromRows,
+  type PageResult,
+} from "@/lib/pagination";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { computeTrustScore } from "@/lib/trust-score";
@@ -56,26 +63,69 @@ function mapRow(row: DonorRow): DonorProfile {
   };
 }
 
-export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
-  return (await fetchRegisteredDonors()).filter((donor) => donor.available);
-}
+const DONOR_LIST_COLUMNS =
+  "id, full_name, blood_group, phone, email, city, area, lat, lng, available, last_donation, age, donations_completed, trust_score, lives_helped, avg_response_minutes, joined_at, telegram_chat_id, telegram_username";
 
-/** Every registered donor, including those currently offline. */
-export async function fetchRegisteredDonors(): Promise<DonorProfile[]> {
-  const supabase = tryCreateClient();
-  if (!supabase || !isSupabaseConfigured()) {
-    return [];
+type QueryClient = {
+  from: (table: string) => any;
+};
+
+export async function queryAvailableDonorPage(
+  supabase: QueryClient,
+  params: { offset: number; limit: number },
+): Promise<PageResult<DonorProfile>> {
+  const to = params.offset + params.limit - 1;
+  const { data, error, count } = await supabase
+    .from("donor_profiles")
+    .select(DONOR_LIST_COLUMNS, { count: "exact" })
+    .eq("available", true)
+    .order("joined_at", { ascending: false })
+    .range(params.offset, to);
+
+  if (error || !data) {
+    return emptyPage(params.offset, params.limit);
   }
 
-  const { data, error } = await supabase.from("donor_profiles").select("*");
-
-  if (error || !data?.length) {
-    return [];
-  }
-
-  return (data as DonorRow[])
+  const mapped = (data as DonorRow[])
     .map(mapRow)
     .filter((donor) => createdAfterReset(donor.joinedAt));
+  return pageFromRows(mapped, params, count ?? null);
+}
+
+export async function fetchAvailableDonorsPage(
+  offset = 0,
+  limit = AVAILABLE_DONOR_PAGE_SIZE,
+): Promise<PageResult<DonorProfile>> {
+  const params = { offset, limit };
+  try {
+    const res = await fetch(
+      `/api/donors?available=1&offset=${offset}&limit=${limit}`,
+      { cache: "no-store", credentials: "include" },
+    );
+    if (res.ok) {
+      const body = (await res.json()) as PageResult<DonorProfile>;
+      if (Array.isArray(body.items)) return body;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) {
+    return emptyPage(offset, limit);
+  }
+  return queryAvailableDonorPage(supabase, params);
+}
+
+export async function fetchAvailableDonors(): Promise<DonorProfile[]> {
+  const page = await fetchAvailableDonorsPage(0, MATCH_DONOR_LIMIT);
+  return page.items;
+}
+
+/** Every registered donor, including those currently offline — first page only. */
+export async function fetchRegisteredDonors(): Promise<DonorProfile[]> {
+  const page = await fetchAvailableDonorsPage(0, MATCH_DONOR_LIMIT);
+  return page.items;
 }
 
 export async function fetchDonorProfile(

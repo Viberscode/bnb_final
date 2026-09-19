@@ -8,7 +8,7 @@ import {
   HospitalLiveMap,
 } from "@/components/request-help/hospital-live-map";
 import { DEMO_HOSPITALS } from "@/data/demo";
-import { distanceKm, formatDistance } from "@/lib/geo";
+import { distanceKm, formatDistance, NEARBY_HOSPITAL_RADIUS_KM } from "@/lib/geo";
 import { cn } from "@/lib/utils";
 import type { Hospital } from "@/types";
 
@@ -137,25 +137,38 @@ export function HospitalSearchPicker({
     let active = true;
     setMapLoading(true);
 
-    const local = DEMO_HOSPITALS.map((item) =>
-      withDistance(item, userCoords ?? mapCenter),
+    const origin = userCoords ?? mapCenter;
+    const local = DEMO_HOSPITALS.map((item) => withDistance(item, origin)).filter(
+      (item) =>
+        typeof item.distanceKm !== "number" ||
+        item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
     );
 
-    setMapPins(local);
+    setMapPins((prev) => {
+      const selected =
+        value && !local.some((item) => item.id === value.id)
+          ? [withDistance(value, origin)]
+          : [];
+      return [...selected, ...local];
+    });
 
     void (async () => {
       try {
         const res = await fetch(
-          `/api/hospitals/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radiusKm=12`,
-          { signal: controller.signal },
+          `/api/hospitals/nearby?lat=${origin.lat}&lng=${origin.lng}&radiusKm=${NEARBY_HOSPITAL_RADIUS_KM}`,
+          { signal: controller.signal, cache: "no-store" },
         );
         if (!res.ok || !active) return;
         const data = (await res.json()) as { hospitals?: Hospital[] };
         const remote = (data.hospitals ?? []).map((item) =>
-          withDistance(item, userCoords ?? mapCenter),
+          withDistance(item, origin),
         );
         const seen = new Set(local.map((item) => normalize(item.name)));
-        const merged = [...local];
+        const merged: PickedHospital[] = [...local];
+        if (value && !seen.has(normalize(value.name))) {
+          merged.unshift(withDistance(value, origin));
+          seen.add(normalize(value.name));
+        }
         for (const item of remote) {
           const key = normalize(item.name);
           if (seen.has(key)) continue;
@@ -174,7 +187,7 @@ export function HospitalSearchPicker({
       active = false;
       controller.abort();
     };
-  }, [mapCenter.lat, mapCenter.lng, userCoords?.lat, userCoords?.lng]);
+  }, [mapCenter.lat, mapCenter.lng, userCoords?.lat, userCoords?.lng, value?.id]);
 
   useEffect(() => {
     if (!fillFlash) return;

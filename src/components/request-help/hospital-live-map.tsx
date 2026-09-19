@@ -63,7 +63,14 @@ export function HospitalLiveMap({
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const userMarkerRef = useRef<import("leaflet").Marker | null>(null);
   const onSelectRef = useRef(onSelect);
+  const hospitalsRef = useRef(hospitals);
+  const selectedIdRef = useRef(selectedId);
+  const userLocationRef = useRef(userLocation);
+  const readyRef = useRef(false);
   onSelectRef.current = onSelect;
+  hospitalsRef.current = hospitals;
+  selectedIdRef.current = selectedId;
+  userLocationRef.current = userLocation;
 
   useEffect(() => {
     let cancelled = false;
@@ -99,56 +106,31 @@ export function HospitalLiveMap({
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
-      window.setTimeout(() => map.invalidateSize(), 80);
+      readyRef.current = true;
+      window.setTimeout(() => {
+        map.invalidateSize();
+        void drawMarkers();
+        void drawUser();
+      }, 80);
     }
 
-    void boot();
-
-    return () => {
-      cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersRef.current = null;
-        userMarkerRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.setView([center.lat, center.lng], map.getZoom() || 14, { animate: true });
-  }, [center.lat, center.lng]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let tries = 0;
-
-    async function renderMarkers() {
+    async function drawMarkers() {
       const map = mapRef.current;
       const group = markersRef.current;
-      if (!map || !group) {
-        if (tries < 20) {
-          tries += 1;
-          window.setTimeout(() => {
-            if (!cancelled) void renderMarkers();
-          }, 100);
-        }
-        return;
-      }
-
+      if (!map || !group) return;
       const L = (await import("leaflet")).default;
-      if (cancelled) return;
-
+      const pins = hospitalsRef.current;
+      const selected = selectedIdRef.current;
       group.clearLayers();
 
-      for (const hospital of hospitals) {
-        const selected = hospital.id === selectedId;
+      for (const hospital of pins) {
+        if (!Number.isFinite(hospital.lat) || !Number.isFinite(hospital.lng)) {
+          continue;
+        }
+        const isSelected = hospital.id === selected;
         const icon = L.divIcon({
           className: "bloodkit-hospital-marker",
-          html: hospitalIconHtml(selected),
+          html: hospitalIconHtml(isSelected),
           iconSize: [MARKER_SIZE, MARKER_SIZE],
           iconAnchor: [MARKER_SIZE / 2, MARKER_SIZE / 2],
         });
@@ -156,7 +138,8 @@ export function HospitalLiveMap({
           icon,
           title: hospital.name,
           riseOnHover: true,
-          zIndexOffset: selected ? 200 : 0,
+          keyboard: true,
+          zIndexOffset: isSelected ? 400 : 200,
         });
         marker.bindTooltip(hospital.name, {
           direction: "top",
@@ -169,41 +152,147 @@ export function HospitalLiveMap({
         group.addLayer(marker);
       }
 
-      window.setTimeout(() => map.invalidateSize(), 40);
+      const points: [number, number][] = pins
+        .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+        .map((item) => [item.lat, item.lng]);
+      const user = userLocationRef.current;
+      if (user && Number.isFinite(user.lat) && Number.isFinite(user.lng)) {
+        points.push([user.lat, user.lng]);
+      }
+      if (points.length >= 2) {
+        map.fitBounds(points, { padding: [28, 28], maxZoom: 15, animate: false });
+      } else if (points.length === 1) {
+        map.setView(points[0], 14, { animate: false });
+      }
     }
 
-    void renderMarkers();
-    return () => {
-      cancelled = true;
-    };
-  }, [hospitals, selectedId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let tries = 0;
-
-    async function renderUser() {
+    async function drawUser() {
       const map = mapRef.current;
-      if (!map) {
-        if (tries < 20) {
-          tries += 1;
-          window.setTimeout(() => {
-            if (!cancelled) void renderUser();
-          }, 100);
-        }
-        return;
-      }
-
+      if (!map) return;
       const L = (await import("leaflet")).default;
-      if (cancelled) return;
-
       if (userMarkerRef.current) {
         map.removeLayer(userMarkerRef.current);
         userMarkerRef.current = null;
       }
+      const user = userLocationRef.current;
+      if (!user) return;
+      const icon = L.divIcon({
+        className: "bloodkit-user-marker",
+        html: userIconHtml(),
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+      const marker = L.marker([user.lat, user.lng], {
+        icon,
+        title: "You",
+        interactive: false,
+        zIndexOffset: 800,
+      });
+      marker.addTo(map);
+      userMarkerRef.current = marker;
+    }
 
+    void boot();
+
+    return () => {
+      cancelled = true;
+      readyRef.current = false;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersRef.current = null;
+        userMarkerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || hospitals.length) return;
+    map.setView([center.lat, center.lng], map.getZoom() || 14, { animate: true });
+  }, [center.lat, center.lng, hospitals.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    async function paint() {
+      const map = mapRef.current;
+      const group = markersRef.current;
+      if (!map || !group) {
+        if (tries < 40) {
+          tries += 1;
+          window.setTimeout(() => {
+            if (!cancelled) void paint();
+          }, 120);
+        }
+        return;
+      }
+      const L = (await import("leaflet")).default;
+      if (cancelled) return;
+      group.clearLayers();
+      for (const hospital of hospitals) {
+        if (!Number.isFinite(hospital.lat) || !Number.isFinite(hospital.lng)) {
+          continue;
+        }
+        const isSelected = hospital.id === selectedId;
+        const icon = L.divIcon({
+          className: "bloodkit-hospital-marker",
+          html: hospitalIconHtml(isSelected),
+          iconSize: [MARKER_SIZE, MARKER_SIZE],
+          iconAnchor: [MARKER_SIZE / 2, MARKER_SIZE / 2],
+        });
+        const marker = L.marker([hospital.lat, hospital.lng], {
+          icon,
+          title: hospital.name,
+          riseOnHover: true,
+          zIndexOffset: isSelected ? 400 : 200,
+        });
+        marker.bindTooltip(hospital.name, {
+          direction: "top",
+          offset: [0, -14],
+          opacity: 0.95,
+        });
+        marker.on("click", () => onSelectRef.current(hospital));
+        group.addLayer(marker);
+      }
+
+      const points: [number, number][] = hospitals
+        .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+        .map((item) => [item.lat, item.lng]);
+      if (userLocation) points.push([userLocation.lat, userLocation.lng]);
+      if (points.length >= 2) {
+        map.fitBounds(points, { padding: [28, 28], maxZoom: 15, animate: false });
+      }
+      window.setTimeout(() => map.invalidateSize(), 40);
+    }
+    void paint();
+    return () => {
+      cancelled = true;
+    };
+  }, [hospitals, selectedId, userLocation?.lat, userLocation?.lng]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    async function paintUser() {
+      const map = mapRef.current;
+      if (!map) {
+        if (tries < 40) {
+          tries += 1;
+          window.setTimeout(() => {
+            if (!cancelled) void paintUser();
+          }, 120);
+        }
+        return;
+      }
+      const L = (await import("leaflet")).default;
+      if (cancelled) return;
+      if (userMarkerRef.current) {
+        map.removeLayer(userMarkerRef.current);
+        userMarkerRef.current = null;
+      }
       if (!userLocation) return;
-
       const icon = L.divIcon({
         className: "bloodkit-user-marker",
         html: userIconHtml(),
@@ -214,13 +303,12 @@ export function HospitalLiveMap({
         icon,
         title: "You",
         interactive: false,
-        zIndexOffset: 500,
+        zIndexOffset: 800,
       });
       marker.addTo(map);
       userMarkerRef.current = marker;
     }
-
-    void renderUser();
+    void paintUser();
     return () => {
       cancelled = true;
     };
@@ -231,6 +319,7 @@ export function HospitalLiveMap({
       ref={containerRef}
       className={cn(
         "absolute inset-0 z-0 h-full w-full",
+        "[&_.leaflet-marker-pane]:z-[650] [&_.leaflet-tooltip-pane]:z-[700]",
         "[&_.bloodkit-hospital-marker]:border-0 [&_.bloodkit-hospital-marker]:bg-transparent",
         "[&_.bloodkit-user-marker]:border-0 [&_.bloodkit-user-marker]:bg-transparent",
         className,

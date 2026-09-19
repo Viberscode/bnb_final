@@ -8,6 +8,7 @@ import "leaflet/dist/leaflet.css";
 type MapHospital = Hospital & { distanceKm?: number };
 
 const DEFAULT_CENTER = { lat: 28.7165, lng: 77.1178 };
+const ROUTE_PANE = "bloodkitRoutePane";
 
 function formatKm(km?: number) {
   if (typeof km !== "number" || !Number.isFinite(km)) return "";
@@ -55,6 +56,27 @@ function userIconHtml() {
   </span>`;
 }
 
+function pickNearest(
+  pins: MapHospital[],
+  nearestId: string | null | undefined,
+  from: { lat: number; lng: number } | null | undefined,
+): MapHospital | null {
+  const byId = nearestId ? pins.find((item) => item.id === nearestId) : null;
+  if (byId) return byId;
+  if (!from) return null;
+  return (
+    [...pins]
+      .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+      .sort((a, b) => {
+        const da =
+          a.distanceKm ?? Math.hypot(a.lat - from.lat, a.lng - from.lng);
+        const db =
+          b.distanceKm ?? Math.hypot(b.lat - from.lat, b.lng - from.lng);
+        return da - db;
+      })[0] ?? null
+  );
+}
+
 export function HospitalLiveMap({
   center,
   hospitals,
@@ -78,16 +100,8 @@ export function HospitalLiveMap({
   const userMarkerRef = useRef<import("leaflet").Marker | null>(null);
   const lineRef = useRef<import("leaflet").Polyline | null>(null);
   const onSelectRef = useRef(onSelect);
-  const hospitalsRef = useRef(hospitals);
-  const selectedIdRef = useRef(selectedId);
-  const nearestIdRef = useRef(nearestId);
-  const userLocationRef = useRef(userLocation);
-  const fittedKeyRef = useRef("");
+  const routeFitKeyRef = useRef("");
   onSelectRef.current = onSelect;
-  hospitalsRef.current = hospitals;
-  selectedIdRef.current = selectedId;
-  nearestIdRef.current = nearestId;
-  userLocationRef.current = userLocation;
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +124,7 @@ export function HospitalLiveMap({
         document.head.appendChild(style);
       }
 
-      const start = userLocationRef.current ?? center;
+      const start = userLocation ?? center;
       const map = L.map(containerRef.current, {
         zoomControl: true,
         attributionControl: true,
@@ -123,6 +137,11 @@ export function HospitalLiveMap({
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
+      if (!map.getPane(ROUTE_PANE)) {
+        const pane = map.createPane(ROUTE_PANE);
+        pane.style.zIndex = "680";
+      }
+
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
 
@@ -130,114 +149,9 @@ export function HospitalLiveMap({
       ro.observe(containerRef.current);
       resizeObserver = ro;
 
-      const draw = () => {
-        map.invalidateSize();
-        void paintAll();
-      };
-      map.whenReady(draw);
-      window.setTimeout(draw, 120);
-      window.setTimeout(draw, 400);
-    }
-
-    async function paintAll() {
-      const map = mapRef.current;
-      const group = markersRef.current;
-      if (!map || !group) return;
-      const L = (await import("leaflet")).default;
-      const pins = hospitalsRef.current;
-      const selected = selectedIdRef.current;
-      const nearest = pins.find((item) => item.id === nearestIdRef.current) ?? null;
-      const user = userLocationRef.current;
-
-      group.clearLayers();
-      for (const hospital of pins) {
-        if (!Number.isFinite(hospital.lat) || !Number.isFinite(hospital.lng)) {
-          continue;
-        }
-        const isSelected = hospital.id === selected;
-        const isNearest = hospital.id === nearest?.id;
-        const w = isNearest || isSelected ? 32 : 26;
-        const h = isNearest || isSelected ? 42 : 34;
-        const icon = L.divIcon({
-          className: "bloodkit-hospital-pin",
-          html: redPinHtml(isNearest, isSelected),
-          iconSize: [w, h],
-          iconAnchor: [w / 2, h],
-        });
-        const marker = L.marker([hospital.lat, hospital.lng], {
-          icon,
-          title: `${hospital.name}${formatKm(hospital.distanceKm)}`,
-          riseOnHover: true,
-          zIndexOffset: isSelected ? 600 : isNearest ? 500 : 250,
-        });
-        marker.bindTooltip(
-          `${isNearest ? "Nearest · " : ""}${hospital.name}${formatKm(hospital.distanceKm)}`,
-          { direction: "top", offset: [0, -36], opacity: 0.95 },
-        );
-        marker.on("click", () => onSelectRef.current(hospital));
-        group.addLayer(marker);
-      }
-
-      if (userMarkerRef.current) {
-        if (user) userMarkerRef.current.setLatLng([user.lat, user.lng]);
-        else {
-          map.removeLayer(userMarkerRef.current);
-          userMarkerRef.current = null;
-        }
-      } else if (user) {
-        const icon = L.divIcon({
-          className: "bloodkit-user-marker",
-          html: userIconHtml(),
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        });
-        userMarkerRef.current = L.marker([user.lat, user.lng], {
-          icon,
-          title: "You",
-          interactive: false,
-          zIndexOffset: 900,
-        }).addTo(map);
-      }
-
-      const linePoints =
-        user && nearest
-          ? ([
-              [user.lat, user.lng],
-              [nearest.lat, nearest.lng],
-            ] as [number, number][])
-          : null;
-
-      if (linePoints) {
-        if (lineRef.current) {
-          lineRef.current.setLatLngs(linePoints);
-        } else {
-          lineRef.current = L.polyline(linePoints, {
-            color: "#c4122f",
-            weight: 3,
-            opacity: 0.95,
-            dashArray: "7 8",
-            lineCap: "round",
-            interactive: false,
-          }).addTo(map);
-        }
-      } else if (lineRef.current) {
-        map.removeLayer(lineRef.current);
-        lineRef.current = null;
-      }
-
-      const key = `${pins.map((item) => item.id).sort().join("|")}:${nearest?.id ?? ""}`;
-      if (fittedKeyRef.current !== key) {
-        fittedKeyRef.current = key;
-        const points: [number, number][] = pins
-          .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
-          .map((item) => [item.lat, item.lng]);
-        if (user) points.push([user.lat, user.lng]);
-        if (points.length >= 2) {
-          map.fitBounds(points, { padding: [40, 40], maxZoom: 15, animate: false });
-        } else if (points.length === 1) {
-          map.setView(points[0], 14, { animate: false });
-        }
-      }
+      map.whenReady(() => map.invalidateSize());
+      window.setTimeout(() => map.invalidateSize(), 120);
+      window.setTimeout(() => map.invalidateSize(), 400);
     }
 
     void boot();
@@ -245,6 +159,7 @@ export function HospitalLiveMap({
     return () => {
       cancelled = true;
       resizeObserver?.disconnect();
+      routeFitKeyRef.current = "";
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -259,41 +174,33 @@ export function HospitalLiveMap({
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
-    async function tick() {
+
+    async function syncMap() {
       const map = mapRef.current;
       if (!map || !markersRef.current) {
-        if (tries < 40) {
+        if (tries < 50) {
           tries += 1;
           window.setTimeout(() => {
-            if (!cancelled) void tick();
-          }, 100);
+            if (!cancelled) void syncMap();
+          }, 80);
         }
         return;
       }
+
       const L = (await import("leaflet")).default;
       if (cancelled) return;
 
+      map.invalidateSize();
+
       const pins = hospitals;
-      const from = userLocation;
-      const nearest =
-        pins.find((item) => item.id === nearestId) ??
-        (from
-          ? [...pins]
-              .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng))
-              .sort((a, b) => {
-                const da =
-                  a.distanceKm ??
-                  Math.hypot(a.lat - from.lat, a.lng - from.lng);
-                const db =
-                  b.distanceKm ??
-                  Math.hypot(b.lat - from.lat, b.lng - from.lng);
-                return da - db;
-              })[0] ?? null
-          : null);
+      const nearest = pickNearest(pins, nearestId, userLocation ?? null);
       const group = markersRef.current;
       group.clearLayers();
+
       for (const hospital of pins) {
-        if (!Number.isFinite(hospital.lat) || !Number.isFinite(hospital.lng)) continue;
+        if (!Number.isFinite(hospital.lat) || !Number.isFinite(hospital.lng)) {
+          continue;
+        }
         const isSelected = hospital.id === selectedId;
         const isNearest = hospital.id === nearest?.id;
         const w = isNearest || isSelected ? 32 : 26;
@@ -344,28 +251,67 @@ export function HospitalLiveMap({
               [nearest.lat, nearest.lng],
             ] as [number, number][])
           : null;
+
       if (linePoints) {
-        if (lineRef.current) lineRef.current.setLatLngs(linePoints);
-        else {
+        if (lineRef.current) {
+          lineRef.current.setLatLngs(linePoints);
+        } else {
           lineRef.current = L.polyline(linePoints, {
             color: "#c4122f",
-            weight: 3,
-            opacity: 0.95,
-            dashArray: "7 8",
+            weight: 4,
+            opacity: 1,
+            dashArray: "8 10",
             lineCap: "round",
+            lineJoin: "round",
             interactive: false,
+            pane: ROUTE_PANE,
           }).addTo(map);
         }
+        lineRef.current.bringToFront();
       } else if (lineRef.current) {
         map.removeLayer(lineRef.current);
         lineRef.current = null;
       }
+
+      if (userLocation && nearest) {
+        const fitKey = `${nearest.id}:${pins.length}`;
+        if (routeFitKeyRef.current !== fitKey) {
+          routeFitKeyRef.current = fitKey;
+          map.fitBounds(
+            [
+              [userLocation.lat, userLocation.lng],
+              [nearest.lat, nearest.lng],
+            ],
+            { padding: [52, 52], maxZoom: 16, animate: false },
+          );
+        }
+      } else if (userLocation && pins.length === 0) {
+        map.setView([userLocation.lat, userLocation.lng], 14, { animate: false });
+      } else if (pins.length >= 1 && userLocation) {
+        const fitKey = `pins:${pins.map((item) => item.id).join("|")}`;
+        if (routeFitKeyRef.current !== fitKey) {
+          routeFitKeyRef.current = fitKey;
+          const points: [number, number][] = pins.map((item) => [
+            item.lat,
+            item.lng,
+          ]);
+          points.push([userLocation.lat, userLocation.lng]);
+          map.fitBounds(points, { padding: [44, 44], maxZoom: 15, animate: false });
+        }
+      }
     }
-    void tick();
+
+    void syncMap();
     return () => {
       cancelled = true;
     };
-  }, [hospitals, selectedId, nearestId, userLocation?.lat, userLocation?.lng]);
+  }, [
+    hospitals,
+    selectedId,
+    nearestId,
+    userLocation?.lat,
+    userLocation?.lng,
+  ]);
 
   return (
     <div

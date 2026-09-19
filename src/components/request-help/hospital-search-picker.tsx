@@ -70,12 +70,32 @@ export function HospitalSearchPicker({
       ? { lat: mapHospital.lat, lng: mapHospital.lng }
       : HOSPITAL_MAP_DEFAULT_CENTER;
 
-  const nearest = useMemo(() => {
+  const mapOrigin = userCoords ?? mapCenter;
+
+  const hospitalsOnMap = useMemo(() => {
+    const withinRadius = (item: PickedHospital) => {
+      const d =
+        typeof item.distanceKm === "number"
+          ? item.distanceKm
+          : distanceKm(mapOrigin.lat, mapOrigin.lng, item.lat, item.lng);
+      return d <= NEARBY_HOSPITAL_RADIUS_KM + 0.5;
+    };
     const ranked = mapPins
-      .filter((item) => typeof item.distanceKm === "number")
+      .filter(
+        (item) =>
+          Number.isFinite(item.lat) &&
+          Number.isFinite(item.lng) &&
+          withinRadius(item),
+      )
+      .map((item) => withDistance(item, mapOrigin))
       .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
-    return ranked[0] ?? null;
-  }, [mapPins]);
+    if (value && !ranked.some((item) => item.id === value.id)) {
+      return [withDistance(value, mapOrigin), ...ranked].slice(0, 24);
+    }
+    return ranked.slice(0, 24);
+  }, [mapPins, mapOrigin.lat, mapOrigin.lng, value?.id]);
+
+  const nearest = useMemo(() => hospitalsOnMap[0] ?? null, [hospitalsOnMap]);
 
   useEffect(() => {
     if (value?.name && value.name !== query) {
@@ -142,11 +162,12 @@ export function HospitalSearchPicker({
 
   useEffect(() => {
     if (!userCoords) return;
-    setMapPins((prev) =>
-      prev
+    setMapPins((prev) => {
+      if (!prev.length) return prev;
+      return prev
         .map((item) => withDistance(item, userCoords))
-        .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99)),
-    );
+        .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
+    });
   }, [userCoords?.lat, userCoords?.lng]);
 
   useEffect(() => {
@@ -165,19 +186,19 @@ export function HospitalSearchPicker({
       (a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99),
     );
     const nearby = local.filter(
-      (item) =>
-        typeof item.distanceKm !== "number" ||
-        item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
+      (item) => (item.distanceKm ?? 99) <= NEARBY_HOSPITAL_RADIUS_KM,
     );
-    const seed = nearby.length ? nearby : local.slice(0, 8);
+    const seed = nearby;
 
-    setMapPins(() => {
-      const selected =
-        value && !seed.some((item) => item.id === value.id)
-          ? [withDistance(value, origin)]
-          : [];
-      return [...selected, ...seed];
-    });
+    if (seed.length) {
+      setMapPins(() => {
+        const selected =
+          value && !seed.some((item) => item.id === value.id)
+            ? [withDistance(value, origin)]
+            : [];
+        return [...selected, ...seed];
+      });
+    }
 
     void (async () => {
       try {
@@ -199,13 +220,17 @@ export function HospitalSearchPicker({
         for (const item of remote) {
           const key = normalize(item.name);
           if (seen.has(key)) continue;
+          if ((item.distanceKm ?? 99) > NEARBY_HOSPITAL_RADIUS_KM + 0.5) continue;
           seen.add(key);
           merged.push(item);
         }
         merged.sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
+        const within = merged.filter(
+          (item) => (item.distanceKm ?? 99) <= NEARBY_HOSPITAL_RADIUS_KM + 0.5,
+        );
         if (active) {
           lastFetchAt.current = { lat: origin.lat, lng: origin.lng };
-          setMapPins(merged);
+          setMapPins(within.length ? within : merged.slice(0, 24));
         }
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
@@ -375,7 +400,7 @@ export function HospitalSearchPicker({
         <div className="relative w-full overflow-hidden bg-[#e8f4f2]">
           <HospitalLiveMap
             center={mapCenter}
-            hospitals={mapPins}
+            hospitals={hospitalsOnMap}
             selectedId={value?.id}
             nearestId={nearest?.id}
             userLocation={userCoords ?? null}

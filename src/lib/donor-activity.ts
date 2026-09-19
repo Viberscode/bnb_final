@@ -88,7 +88,7 @@ export async function fetchDonorActivity(
   const { data, error } = await supabase
     .from("request_assignments")
     .select(
-      "status, assigned_at, updated_at, blood_requests(status, urgency, hospital_area, hospital_name, created_at, patients_count)",
+      "status, assigned_at, blood_requests(status, urgency, hospital_area, hospital_name, created_at, patients_count)",
     )
     .eq("donor_id", donorId)
     .eq("status", "accepted");
@@ -114,28 +114,6 @@ export async function fetchDonorActivity(
     }
     const city = cityKey(request.hospital_area, request.hospital_name);
     cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
-  }
-
-  // Donor response = time from offer (assigned_at) to accept (updated_at).
-  for (const row of rows) {
-    const offeredAt = row.assigned_at
-      ? new Date(row.assigned_at).getTime()
-      : NaN;
-    const acceptedAt = row.updated_at
-      ? new Date(row.updated_at).getTime()
-      : NaN;
-    if (
-      !Number.isFinite(offeredAt) ||
-      !Number.isFinite(acceptedAt) ||
-      acceptedAt < offeredAt
-    ) {
-      continue;
-    }
-    const mins = (acceptedAt - offeredAt) / 60_000;
-    const clean = sanitizeResponseMinutes(mins);
-    if (clean == null) continue;
-    responseSamples.push(clean);
-    if (clean <= 5) rapidCompleted += 1;
   }
 
   let maxInOneCity = 0;

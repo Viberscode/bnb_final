@@ -160,22 +160,23 @@ export function HospitalSearchPicker({
     const controller = new AbortController();
     let active = true;
     setMapLoading(true);
-    lastFetchAt.current = { lat: origin.lat, lng: origin.lng };
 
-    const local = DEMO_HOSPITALS.map((item) => withDistance(item, origin))
-      .filter(
-        (item) =>
-          typeof item.distanceKm !== "number" ||
-          item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
-      )
-      .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
+    const local = DEMO_HOSPITALS.map((item) => withDistance(item, origin)).sort(
+      (a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99),
+    );
+    const nearby = local.filter(
+      (item) =>
+        typeof item.distanceKm !== "number" ||
+        item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
+    );
+    const seed = nearby.length ? nearby : local.slice(0, 8);
 
     setMapPins(() => {
       const selected =
-        value && !local.some((item) => item.id === value.id)
+        value && !seed.some((item) => item.id === value.id)
           ? [withDistance(value, origin)]
           : [];
-      return [...selected, ...local];
+      return [...selected, ...seed];
     });
 
     void (async () => {
@@ -189,8 +190,8 @@ export function HospitalSearchPicker({
         const remote = (data.hospitals ?? []).map((item) =>
           withDistance(item, origin),
         );
-        const seen = new Set(local.map((item) => normalize(item.name)));
-        const merged: PickedHospital[] = [...local];
+        const seen = new Set(seed.map((item) => normalize(item.name)));
+        const merged: PickedHospital[] = [...seed];
         if (value && !seen.has(normalize(value.name))) {
           merged.unshift(withDistance(value, origin));
           seen.add(normalize(value.name));
@@ -202,7 +203,10 @@ export function HospitalSearchPicker({
           merged.push(item);
         }
         merged.sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
-        if (active) setMapPins(merged);
+        if (active) {
+          lastFetchAt.current = { lat: origin.lat, lng: origin.lng };
+          setMapPins(merged);
+        }
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
       } finally {
@@ -368,7 +372,7 @@ export function HospitalSearchPicker({
             </span>
           </button>
         ) : null}
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#e8f4f2]">
+        <div className="relative w-full overflow-hidden bg-[#e8f4f2]">
           <HospitalLiveMap
             center={mapCenter}
             hospitals={mapPins}

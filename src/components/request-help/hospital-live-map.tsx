@@ -95,6 +95,7 @@ export function HospitalLiveMap({
 
   useEffect(() => {
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
 
     async function boot() {
       const L = (await import("leaflet")).default;
@@ -117,7 +118,7 @@ export function HospitalLiveMap({
         zoomControl: true,
         attributionControl: true,
         scrollWheelZoom: true,
-      }).setView([center.lat, center.lng], 14);
+      }).setView([center.lat, center.lng], 13);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -127,11 +128,23 @@ export function HospitalLiveMap({
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
+
+      const ro = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      ro.observe(containerRef.current);
+      resizeObserver = ro;
+
+      map.whenReady(() => {
+        map.invalidateSize();
+        void drawMarkers();
+        void drawUser();
+      });
       window.setTimeout(() => {
         map.invalidateSize();
         void drawMarkers();
         void drawUser();
-      }, 80);
+      }, 200);
     }
 
     async function drawMarkers() {
@@ -233,6 +246,7 @@ export function HospitalLiveMap({
 
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -372,10 +386,8 @@ export function HospitalLiveMap({
     <div
       ref={containerRef}
       className={cn(
-        "absolute inset-0 z-0 h-full w-full",
-        "[&_.leaflet-marker-pane]:z-[650] [&_.leaflet-tooltip-pane]:z-[700]",
-        "[&_.bloodkit-hospital-marker]:border-0 [&_.bloodkit-hospital-marker]:bg-transparent",
-        "[&_.bloodkit-user-marker]:border-0 [&_.bloodkit-user-marker]:bg-transparent",
+        "relative z-10 h-[320px] min-h-[280px] w-full overflow-hidden rounded-b-2xl",
+        "[&_.leaflet-container]:!h-full [&_.leaflet-container]:!w-full",
         className,
       )}
       role="presentation"

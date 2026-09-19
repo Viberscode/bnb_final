@@ -306,21 +306,19 @@ async function fetchRemoteStore(
   const ids = [...new Set((requestIds ?? []).filter(Boolean))].slice(0, 40);
 
   remoteFetchInFlight = (async () => {
-    const withEligible =
-      "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids, eligible_donor_ids";
-    const withoutEligible =
-      "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids";
-
     async function load(columns: string) {
       let query = supabase.from("request_assignments").select(columns);
       if (ids.length) query = query.in("request_id", ids);
-      // Live tables may not have updated_at — assigned_at is always present.
-      return query.order("assigned_at", { ascending: false }).limit(80);
+      return query.limit(80);
     }
 
-    let { data, error } = await load(withEligible);
+    const coreColumns =
+      "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids";
+    let { data, error } = await load(coreColumns);
     if (error && !isMissingAssignmentsTable(error)) {
-      const retry = await load(withoutEligible);
+      const retry = await load(
+        "request_id, donor_id, donor_name, blood_group, status, assigned_at, expires_at",
+      );
       data = retry.data;
       error = retry.error;
     }
@@ -364,14 +362,12 @@ async function persistAssignment(requestId: string, assignment: DonorAssignment)
     expires_at: assignment.expiresAt,
     declined_donor_ids: assignment.declinedDonorIds,
     eligible_donor_ids: assignment.eligibleDonorIds ?? [],
-    updated_at: new Date().toISOString(),
   };
   let { error } = await supabase.from("request_assignments").upsert(payload, {
     onConflict: "request_id",
   });
   if (error && /eligible_donor_ids|updated_at/i.test(error.message)) {
-    const { eligible_donor_ids: _eligible, updated_at: _updated, ...core } =
-      payload;
+    const { eligible_donor_ids: _eligible, ...core } = payload;
     const retry = await supabase
       .from("request_assignments")
       .upsert(core, { onConflict: "request_id" });

@@ -306,17 +306,24 @@ async function fetchRemoteStore(
   const ids = [...new Set((requestIds ?? []).filter(Boolean))].slice(0, 40);
 
   remoteFetchInFlight = (async () => {
-    const ASSIGNMENT_COLUMNS =
+    const withEligible =
       "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids, eligible_donor_ids";
-    let query = supabase
-      .from("request_assignments")
-      .select(ASSIGNMENT_COLUMNS);
-    if (ids.length) {
-      query = query.in("request_id", ids);
+    const withoutEligible =
+      "request_id, donor_id, donor_name, blood_group, donations_completed, distance_km, status, assigned_at, expires_at, declined_donor_ids";
+
+    async function load(columns: string) {
+      let query = supabase.from("request_assignments").select(columns);
+      if (ids.length) query = query.in("request_id", ids);
+      // Live tables may not have updated_at — assigned_at is always present.
+      return query.order("assigned_at", { ascending: false }).limit(80);
     }
-    const { data, error } = await query
-      .order("updated_at", { ascending: false })
-      .limit(80);
+
+    let { data, error } = await load(withEligible);
+    if (error && !isMissingAssignmentsTable(error)) {
+      const retry = await load(withoutEligible);
+      data = retry.data;
+      error = retry.error;
+    }
     lastRemoteFetchAt = Date.now();
     if (error) {
       if (isMissingAssignmentsTable(error)) markAssignmentsRemoteUnavailable();
@@ -362,11 +369,12 @@ async function persistAssignment(requestId: string, assignment: DonorAssignment)
   let { error } = await supabase.from("request_assignments").upsert(payload, {
     onConflict: "request_id",
   });
-  if (error && /eligible_donor_ids/i.test(error.message)) {
-    const { eligible_donor_ids: _drop, ...withoutEligible } = payload;
+  if (error && /eligible_donor_ids|updated_at/i.test(error.message)) {
+    const { eligible_donor_ids: _eligible, updated_at: _updated, ...core } =
+      payload;
     const retry = await supabase
       .from("request_assignments")
-      .upsert(withoutEligible, { onConflict: "request_id" });
+      .upsert(core, { onConflict: "request_id" });
     error = retry.error;
   }
   if (error) {

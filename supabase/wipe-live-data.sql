@@ -2,7 +2,9 @@
 -- Keeps schema, RLS, auth providers, and UI the same.
 -- Run once in Supabase → SQL Editor → Run.
 
--- 1) Live matching + requests
+-- 1) Emergency + live matching + requests (FK order)
+delete from public.emergency_call_attempts;
+delete from public.emergency_escalations;
 delete from public.request_assignments;
 delete from public.blood_requests;
 

@@ -67,23 +67,27 @@ function mapRow(row: DonorRow): DonorProfile {
   };
 }
 
-const DONOR_LIST_COLUMNS_BASE =
-  "id, full_name, blood_group, phone, email, city, area, available, last_donation, age, notes, donations_completed, trust_score, lives_helped, avg_response_minutes, joined_at, telegram_chat_id, telegram_username";
+const DONOR_LIST_COLUMNS_MINIMAL =
+  "id, full_name, blood_group, phone, email, city, area, available, last_donation, age, notes, donations_completed, trust_score, lives_helped, avg_response_minutes, joined_at";
 
-const DONOR_LIST_COLUMNS_WITH_COORDS = `${DONOR_LIST_COLUMNS_BASE}, lat, lng`;
+const DONOR_LIST_COLUMNS_WITH_TELEGRAM = `${DONOR_LIST_COLUMNS_MINIMAL}, telegram_chat_id, telegram_username`;
+
+const DONOR_LIST_COLUMNS_WITH_COORDS = `${DONOR_LIST_COLUMNS_WITH_TELEGRAM}, lat, lng`;
 
 const DONOR_LIST_COLUMNS_WITH_EMERGENCY = `${DONOR_LIST_COLUMNS_WITH_COORDS}, emergency_voice_calls, phone_verified`;
 
 const DONOR_SELECT_TRIES = [
   DONOR_LIST_COLUMNS_WITH_EMERGENCY,
   DONOR_LIST_COLUMNS_WITH_COORDS,
-  DONOR_LIST_COLUMNS_BASE,
+  DONOR_LIST_COLUMNS_WITH_TELEGRAM,
+  DONOR_LIST_COLUMNS_MINIMAL,
 ];
 
 const DONOR_SINGLE_SELECT_TRIES = [
   `${DONOR_LIST_COLUMNS_WITH_EMERGENCY}, updated_at`,
   `${DONOR_LIST_COLUMNS_WITH_COORDS}, updated_at`,
-  `${DONOR_LIST_COLUMNS_BASE}, updated_at`,
+  `${DONOR_LIST_COLUMNS_WITH_TELEGRAM}, updated_at`,
+  `${DONOR_LIST_COLUMNS_MINIMAL}, updated_at`,
 ];
 
 function isMissingColumnError(error: { message?: string } | null) {
@@ -135,20 +139,23 @@ async function selectDonorProfileRow(
 
 type DonorUpsertPayload = Record<string, unknown>;
 
+const DONOR_OPTIONAL_UPSERT_GROUPS: (keyof DonorUpsertPayload)[][] = [
+  ["lat", "lng"],
+  ["emergency_voice_calls", "phone_verified"],
+  ["telegram_chat_id", "telegram_username"],
+];
+
 function donorUpsertVariants(payload: DonorUpsertPayload): DonorUpsertPayload[] {
-  const withoutCoords = { ...payload };
-  delete withoutCoords.lat;
-  delete withoutCoords.lng;
-
-  const withoutEmergency = { ...payload };
-  delete withoutEmergency.emergency_voice_calls;
-  delete withoutEmergency.phone_verified;
-
-  const withoutBoth = { ...withoutCoords };
-  delete withoutBoth.emergency_voice_calls;
-  delete withoutBoth.phone_verified;
-
-  return [payload, withoutCoords, withoutEmergency, withoutBoth];
+  const variants: { mask: number; body: DonorUpsertPayload }[] = [];
+  const groupCount = DONOR_OPTIONAL_UPSERT_GROUPS.length;
+  for (let mask = 0; mask < 1 << groupCount; mask++) {
+    const body = { ...payload };
+    DONOR_OPTIONAL_UPSERT_GROUPS.forEach((keys, index) => {
+      if (mask & (1 << index)) keys.forEach((key) => delete body[key]);
+    });
+    variants.push({ mask, body });
+  }
+  return variants.sort((a, b) => a.mask - b.mask).map((item) => item.body);
 }
 
 type QueryClient = {

@@ -1,5 +1,5 @@
--- Recreate live-request + donor-match tables if they are missing.
--- Run once in Supabase → SQL Editor.
+-- Live requests + donor matching (slice of supabase/migrate.sql)
+-- Run migrate.sql once on existing projects for every column + policy.
 
 create table if not exists public.blood_requests (
   id uuid primary key default gen_random_uuid(),
@@ -19,17 +19,28 @@ create table if not exists public.blood_requests (
   group_units jsonb not null default '{}'::jsonb,
   status text not null default 'matching',
   distance_km numeric,
+  hospital_lat double precision,
+  hospital_lng double precision,
+  verification_status text not null default 'pending',
+  verified_at timestamptz,
+  verified_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
-alter table public.blood_requests
-  add column if not exists voice_note_url text;
+alter table public.blood_requests add column if not exists voice_note_url text;
 alter table public.blood_requests
   add column if not exists patients_count integer not null default 1;
 alter table public.blood_requests
   add column if not exists blood_groups text[] not null default '{}';
 alter table public.blood_requests
   add column if not exists group_units jsonb not null default '{}'::jsonb;
+alter table public.blood_requests add column if not exists hospital_lat double precision;
+alter table public.blood_requests add column if not exists hospital_lng double precision;
+alter table public.blood_requests
+  add column if not exists verification_status text not null default 'pending';
+alter table public.blood_requests add column if not exists verified_at timestamptz;
+alter table public.blood_requests
+  add column if not exists verified_by uuid references auth.users (id) on delete set null;
 
 create index if not exists blood_requests_created_at_idx
   on public.blood_requests (created_at desc);

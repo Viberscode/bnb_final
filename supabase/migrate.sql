@@ -1,17 +1,10 @@
--- BloodKit Supabase schema
--- New project: run this entire file in Supabase SQL Editor.
--- Existing project (missing columns): run supabase/migrate.sql instead (idempotent sync).
+-- BloodKit schema sync (idempotent — safe to re-run)
+-- Run the FULL file in Supabase → SQL Editor after pulling app updates.
+-- Individual files (donor-telegram.sql, emergency-escalation.sql, etc.) are slices of this.
 
--- Profiles (linked to auth.users / Google login)
-create table if not exists public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  full_name text,
-  email text,
-  avatar_url text,
-  created_at timestamptz not null default now()
-);
-
--- Donor dashboards
+-- ---------------------------------------------------------------------------
+-- donor_profiles
+-- ---------------------------------------------------------------------------
 create table if not exists public.donor_profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null,
@@ -38,125 +31,25 @@ create table if not exists public.donor_profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.donor_profiles add column if not exists telegram_chat_id text;
+alter table public.donor_profiles add column if not exists telegram_username text;
 alter table public.donor_profiles add column if not exists lat double precision;
 alter table public.donor_profiles add column if not exists lng double precision;
-alter table public.donor_profiles
-  add column if not exists telegram_chat_id text;
-alter table public.donor_profiles
-  add column if not exists telegram_username text;
 alter table public.donor_profiles
   add column if not exists emergency_voice_calls boolean not null default false;
 alter table public.donor_profiles
   add column if not exists phone_verified boolean not null default false;
 
--- Live blood requests (realtime)
-create table if not exists public.blood_requests (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users (id) on delete set null,
-  blood_group text not null,
-  urgency text not null check (urgency in ('critical', 'urgent', 'planned')),
-  hospital_id text not null,
-  hospital_name text not null,
-  hospital_area text not null,
-  contact_name text not null,
-  phone text not null default '',
-  units integer not null default 1,
-  notes text,
-  voice_note_url text,
-  patients_count integer not null default 1,
-  blood_groups text[] not null default '{}',
-  group_units jsonb not null default '{}'::jsonb,
-  status text not null default 'matching',
-  distance_km numeric,
-  hospital_lat double precision,
-  hospital_lng double precision,
-  verification_status text not null default 'pending',
-  verified_at timestamptz,
-  verified_by uuid references auth.users (id) on delete set null,
-  created_at timestamptz not null default now()
-);
-
-alter table public.blood_requests
-  add column if not exists voice_note_url text;
-
-alter table public.blood_requests
-  add column if not exists patients_count integer not null default 1;
-
-alter table public.blood_requests
-  add column if not exists blood_groups text[] not null default '{}';
-
-alter table public.blood_requests
-  add column if not exists group_units jsonb not null default '{}'::jsonb;
-
-alter table public.blood_requests
-  add column if not exists hospital_lat double precision;
-
-alter table public.blood_requests
-  add column if not exists hospital_lng double precision;
-
-alter table public.blood_requests
-  add column if not exists verification_status text not null default 'pending';
-
-alter table public.blood_requests
-  add column if not exists verified_at timestamptz;
-
-alter table public.blood_requests
-  add column if not exists verified_by uuid references auth.users (id) on delete set null;
-
-create index if not exists blood_requests_created_at_idx
-  on public.blood_requests (created_at desc);
-
-create index if not exists blood_requests_urgency_idx
-  on public.blood_requests (urgency);
-
--- Auto-create profile row when a Google user signs up
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (id, full_name, email, avatar_url)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
-    new.email,
-    new.raw_user_meta_data->>'avatar_url'
-  )
-  on conflict (id) do update set
-    full_name = excluded.full_name,
-    email = excluded.email,
-    avatar_url = excluded.avatar_url;
-  return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-
--- RLS
-alter table public.profiles enable row level security;
 alter table public.donor_profiles enable row level security;
-alter table public.blood_requests enable row level security;
 
--- Profiles
-drop policy if exists "Profiles are viewable by everyone" on public.profiles;
-create policy "Profiles are viewable by everyone"
-  on public.profiles for select using (true);
-drop policy if exists "Users can update own profile" on public.profiles;
-create policy "Users can update own profile"
-  on public.profiles for update using (auth.uid() = id);
-
--- Donor profiles
 drop policy if exists "Donor profiles are viewable by everyone" on public.donor_profiles;
 create policy "Donor profiles are viewable by everyone"
   on public.donor_profiles for select using (true);
+
 drop policy if exists "Users can insert own donor profile" on public.donor_profiles;
 create policy "Users can insert own donor profile"
   on public.donor_profiles for insert with check (auth.uid() = id);
+
 drop policy if exists "Users can update own donor profile" on public.donor_profiles;
 create policy "Users can update own donor profile"
   on public.donor_profiles for update using (auth.uid() = id);
@@ -199,14 +92,66 @@ $$;
 revoke all on function public.link_donor_telegram(uuid, text, text) from public;
 grant execute on function public.link_donor_telegram(uuid, text, text) to anon, authenticated, service_role;
 
--- Blood requests: public read, authenticated write
+-- ---------------------------------------------------------------------------
+-- blood_requests
+-- ---------------------------------------------------------------------------
+create table if not exists public.blood_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete set null,
+  blood_group text not null,
+  urgency text not null check (urgency in ('critical', 'urgent', 'planned')),
+  hospital_id text not null,
+  hospital_name text not null,
+  hospital_area text not null,
+  contact_name text not null,
+  phone text not null default '',
+  units integer not null default 1,
+  notes text,
+  voice_note_url text,
+  patients_count integer not null default 1,
+  blood_groups text[] not null default '{}',
+  group_units jsonb not null default '{}'::jsonb,
+  status text not null default 'matching',
+  distance_km numeric,
+  hospital_lat double precision,
+  hospital_lng double precision,
+  verification_status text not null default 'pending',
+  verified_at timestamptz,
+  verified_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.blood_requests add column if not exists voice_note_url text;
+alter table public.blood_requests
+  add column if not exists patients_count integer not null default 1;
+alter table public.blood_requests
+  add column if not exists blood_groups text[] not null default '{}';
+alter table public.blood_requests
+  add column if not exists group_units jsonb not null default '{}'::jsonb;
+alter table public.blood_requests add column if not exists hospital_lat double precision;
+alter table public.blood_requests add column if not exists hospital_lng double precision;
+alter table public.blood_requests
+  add column if not exists verification_status text not null default 'pending';
+alter table public.blood_requests add column if not exists verified_at timestamptz;
+alter table public.blood_requests
+  add column if not exists verified_by uuid references auth.users (id) on delete set null;
+
+create index if not exists blood_requests_created_at_idx
+  on public.blood_requests (created_at desc);
+create index if not exists blood_requests_urgency_idx
+  on public.blood_requests (urgency);
+
+alter table public.blood_requests enable row level security;
+
 drop policy if exists "Blood requests are viewable by everyone" on public.blood_requests;
 create policy "Blood requests are viewable by everyone"
   on public.blood_requests for select using (true);
+
 drop policy if exists "Authenticated users can create blood requests" on public.blood_requests;
 create policy "Authenticated users can create blood requests"
   on public.blood_requests for insert
   with check (auth.uid() = user_id or auth.uid() is not null);
+
 drop policy if exists "Owners can update their blood requests" on public.blood_requests;
 create policy "Owners can update their blood requests"
   on public.blood_requests for update using (auth.uid() = user_id);
@@ -214,25 +159,9 @@ create policy "Owners can update their blood requests"
 grant select on public.blood_requests to anon, authenticated;
 grant insert, update on public.blood_requests to authenticated;
 
--- Voice notes (public playback for donors)
-insert into storage.buckets (id, name, public)
-values ('request-voice-notes', 'request-voice-notes', true)
-on conflict (id) do nothing;
-
-drop policy if exists "Voice notes are publicly readable" on storage.objects;
-create policy "Voice notes are publicly readable"
-  on storage.objects for select
-  using (bucket_id = 'request-voice-notes');
-
-drop policy if exists "Authenticated users can upload voice notes" on storage.objects;
-create policy "Authenticated users can upload voice notes"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'request-voice-notes'
-    and auth.uid() is not null
-  );
-
--- Automated donor assignment (priority + timeout + decline)
+-- ---------------------------------------------------------------------------
+-- request_assignments
+-- ---------------------------------------------------------------------------
 create table if not exists public.request_assignments (
   request_id uuid primary key references public.blood_requests (id) on delete cascade,
   donor_id uuid,
@@ -269,7 +198,9 @@ create policy "Authenticated users can update assignments"
 grant select on public.request_assignments to anon, authenticated;
 grant insert, update on public.request_assignments to authenticated;
 
--- Emergency escalation (critical voice/SMS)
+-- ---------------------------------------------------------------------------
+-- emergency escalation
+-- ---------------------------------------------------------------------------
 create table if not exists public.emergency_escalations (
   request_id uuid primary key references public.blood_requests (id) on delete cascade,
   severity text not null,
@@ -324,7 +255,9 @@ create policy "Call attempts readable"
 grant select on public.emergency_escalations to anon, authenticated;
 grant select on public.emergency_call_attempts to anon, authenticated;
 
--- Realtime (safe to re-run)
+-- ---------------------------------------------------------------------------
+-- Realtime publication (ignore if already added)
+-- ---------------------------------------------------------------------------
 do $$
 begin
   alter publication supabase_realtime add table public.blood_requests;
@@ -347,29 +280,3 @@ exception
 end $$;
 
 notify pgrst, 'reload schema';
-
--- NGO / hospital partner profiles
-create table if not exists public.ngo_profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  name text not null,
-  registration_no text not null,
-  certificate_name text,
-  certificate_url text,
-  address text not null,
-  phone text not null,
-  authorized_person text not null,
-  joined_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.ngo_profiles enable row level security;
-
-drop policy if exists "NGO profiles are viewable by everyone" on public.ngo_profiles;
-create policy "NGO profiles are viewable by everyone"
-  on public.ngo_profiles for select using (true);
-drop policy if exists "Users can insert own NGO profile" on public.ngo_profiles;
-create policy "Users can insert own NGO profile"
-  on public.ngo_profiles for insert with check (auth.uid() = id);
-drop policy if exists "Users can update own NGO profile" on public.ngo_profiles;
-create policy "Users can update own NGO profile"
-  on public.ngo_profiles for update using (auth.uid() = id);

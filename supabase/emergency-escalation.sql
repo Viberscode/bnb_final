@@ -1,4 +1,5 @@
--- Escalated Emergency Calling (run in Supabase SQL Editor)
+-- Escalated Emergency Calling
+-- Full copy lives in supabase/migrate.sql — run migrate.sql on existing DBs.
 
 alter table public.blood_requests
   add column if not exists verification_status text not null default 'pending';
@@ -68,3 +69,5 @@ create policy "Call attempts readable"
 
 grant select on public.emergency_escalations to anon, authenticated;
 grant select on public.emergency_call_attempts to anon, authenticated;
+
+notify pgrst, 'reload schema';

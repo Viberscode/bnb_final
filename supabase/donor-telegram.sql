@@ -1,41 +1,14 @@
--- Creates donor_profiles if missing, then adds Telegram linking.
--- Paste ALL of this into Supabase SQL Editor (project: xrsqfnqvjhrkngzeuuua) and Run.
+-- Slice of supabase/migrate.sql — Telegram bot linking only.
+-- For existing projects, prefer running migrate.sql once (full column sync).
 
-create table if not exists public.donor_profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  full_name text not null,
-  blood_group text not null,
-  phone text not null,
-  email text,
-  city text not null,
-  area text not null,
-  available boolean not null default true,
-  last_donation date,
-  age integer,
-  notes text,
-  donations_completed integer not null default 0,
-  trust_score integer not null default 72,
-  lives_helped integer not null default 0,
-  avg_response_minutes integer not null default 14,
-  telegram_chat_id text,
-  telegram_username text,
-  lat double precision,
-  lng double precision,
-  joined_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
+alter table public.donor_profiles add column if not exists telegram_chat_id text;
+alter table public.donor_profiles add column if not exists telegram_username text;
+alter table public.donor_profiles add column if not exists lat double precision;
+alter table public.donor_profiles add column if not exists lng double precision;
 alter table public.donor_profiles
-  add column if not exists lat double precision;
-
+  add column if not exists emergency_voice_calls boolean not null default false;
 alter table public.donor_profiles
-  add column if not exists lng double precision;
-
-alter table public.donor_profiles
-  add column if not exists telegram_chat_id text;
-
-alter table public.donor_profiles
-  add column if not exists telegram_username text;
+  add column if not exists phone_verified boolean not null default false;
 
 alter table public.donor_profiles enable row level security;
 

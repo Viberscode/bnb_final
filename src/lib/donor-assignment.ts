@@ -306,8 +306,11 @@ async function fetchRemoteStore(
   const ids = [...new Set((requestIds ?? []).filter(Boolean))].slice(0, 40);
 
   remoteFetchInFlight = (async () => {
+    const client = supabase;
+    if (!client) return remoteCache;
+
     async function load(columns: string) {
-      let query = supabase.from("request_assignments").select(columns);
+      let query = client.from("request_assignments").select(columns);
       if (ids.length) query = query.in("request_id", ids);
       return query.limit(80);
     }
@@ -330,7 +333,7 @@ async function fetchRemoteStore(
     remoteAssignmentsReady = true;
     remoteUnavailableUntil = 0;
     const next: AssignmentStore = ids.length ? { ...remoteCache } : {};
-    for (const row of (data ?? []) as Record<string, unknown>[]) {
+    for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
       const requestId = String(row.request_id ?? "");
       const assignment = toAssignment(row);
       if (requestId && assignment) next[requestId] = assignment;

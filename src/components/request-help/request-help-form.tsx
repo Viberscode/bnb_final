@@ -336,18 +336,24 @@ export function RequestHelpForm() {
         voiceNoteUrl,
         distanceKm: selectedHospital.distanceKm,
       });
-      const nextDonors = (await fetchAvailableDonors()).filter(
-        (donor) => donor.id !== user?.id,
-      );
       const owned = user?.id
         ? { ...request, userId: request.userId ?? user.id }
         : request;
-      void notifyDonorsRequestIsLive(owned.id);
-      const assigned = await startAssignmentForRequest(owned, nextDonors);
-      setDonors(nextDonors);
-      setActiveRequest(assigned ?? owned);
+      setActiveRequest(owned);
       setSearchOpen(true);
       setSubmitting(false);
+
+      try {
+        const nextDonors = (await fetchAvailableDonors()).filter(
+          (donor) => donor.id !== user?.id,
+        );
+        void notifyDonorsRequestIsLive(owned.id);
+        const assigned = await startAssignmentForRequest(owned, nextDonors);
+        setDonors(nextDonors);
+        if (assigned) setActiveRequest(assigned);
+      } catch {
+        /* request is live; donor matching can catch up in the background */
+      }
     } catch (err) {
       setError(
         err instanceof Error

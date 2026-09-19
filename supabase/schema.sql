@@ -72,6 +72,12 @@ alter table public.blood_requests
 alter table public.blood_requests
   add column if not exists group_units jsonb not null default '{}'::jsonb;
 
+alter table public.blood_requests
+  add column if not exists hospital_lat double precision;
+
+alter table public.blood_requests
+  add column if not exists hospital_lng double precision;
+
 create index if not exists blood_requests_created_at_idx
   on public.blood_requests (created_at desc);
 

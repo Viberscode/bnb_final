@@ -29,10 +29,16 @@ create table if not exists public.donor_profiles (
   avg_response_minutes integer not null default 14,
   telegram_chat_id text,
   telegram_username text,
+  lat double precision,
+  lng double precision,
   joined_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table public.donor_profiles
+  add column if not exists lat double precision;
+alter table public.donor_profiles
+  add column if not exists lng double precision;
 alter table public.donor_profiles
   add column if not exists telegram_chat_id text;
 alter table public.donor_profiles

@@ -6,12 +6,35 @@ import { useLanguage, type MessagePath } from "@/components/i18n/language-provid
 import { MedalBadge } from "@/components/achievements/medal-badge";
 import type { MedalProgress } from "@/lib/achievements";
 
-export const MEDAL_COPY: Record<string, { name: MessagePath; req: MessagePath }> = {
-  "first-lifesaver": { name: "medals.firstLifesaver", req: "medals.firstLifesaverReq" },
-  guardian: { name: "medals.guardian", req: "medals.guardianReq" },
-  lifesaver: { name: "medals.lifesaver", req: "medals.lifesaverReq" },
-  champion: { name: "medals.champion", req: "medals.championReq" },
-  legend: { name: "medals.legend", req: "medals.legendReq" },
+export const MEDAL_COPY: Record<
+  string,
+  { name: MessagePath; req: MessagePath; perk?: MessagePath }
+> = {
+  "reward-5": {
+    name: "medals.reward5Name",
+    req: "medals.reward5Req",
+    perk: "medals.reward5Perk",
+  },
+  "reward-10": {
+    name: "medals.reward10Name",
+    req: "medals.reward10Req",
+    perk: "medals.reward10Perk",
+  },
+  "reward-15": {
+    name: "medals.reward15Name",
+    req: "medals.reward15Req",
+    perk: "medals.reward15Perk",
+  },
+  "reward-20": {
+    name: "medals.reward20Name",
+    req: "medals.reward20Req",
+    perk: "medals.reward20Perk",
+  },
+  "reward-25": {
+    name: "medals.reward25Name",
+    req: "medals.reward25Req",
+    perk: "medals.reward25Perk",
+  },
   "critical-responder": {
     name: "medals.criticalResponder",
     req: "medals.criticalResponderReq",
@@ -77,6 +100,11 @@ export function MedalDetailModal({
           {t(copy.name)}
         </h2>
         <p className="mt-1 text-sm font-semibold text-ink-muted">{t(copy.req)}</p>
+        {copy.perk ? (
+          <p className="mt-2 text-sm font-bold leading-snug text-teal-deep">
+            {t(copy.perk)}
+          </p>
+        ) : null}
         <div className="mt-4 rounded-2xl border border-line bg-paper/70 px-4 py-3">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-ink-muted">
             {t("medals.progress")}
@@ -92,7 +120,11 @@ export function MedalDetailModal({
           </p>
         </div>
         <p className="mt-3 text-xs font-semibold text-ink-muted">
-          {medal.earned ? t("medals.earnedHint") : t("medals.lockedHint")}
+          {medal.earned
+            ? medal.category === "reward"
+              ? t("medals.rewardUnlockedHint")
+              : t("medals.earnedHint")
+            : t("medals.lockedHint")}
         </p>
       </div>
     </div>

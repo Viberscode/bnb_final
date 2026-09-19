@@ -20,13 +20,17 @@ export type MedalIcon =
   | "siren"
   | "zap"
   | "heart"
-  | "handshake";
+  | "handshake"
+  | "gift"
+  | "stethoscope"
+  | "luggage"
+  | "percent";
 
 export type MedalMetric = keyof DonorActivity;
 
 export interface MedalDefinition {
   id: string;
-  category: "milestone" | "honour";
+  category: "reward" | "honour";
   metal: MedalMetal;
   icon: MedalIcon;
   metric: MedalMetric;
@@ -38,48 +42,52 @@ export interface MedalProgress extends MedalDefinition {
   earned: boolean;
 }
 
-export const MILESTONE_MEDALS: MedalDefinition[] = [
+/** Partner perks unlocked every 5 verified donations. */
+export const DONATION_REWARDS: MedalDefinition[] = [
   {
-    id: "first-lifesaver",
-    category: "milestone",
+    id: "reward-5",
+    category: "reward",
     metal: "bronze",
-    icon: "droplet",
-    metric: "verifiedDonations",
-    threshold: 1,
-  },
-  {
-    id: "guardian",
-    category: "milestone",
-    metal: "silver",
-    icon: "shield",
-    metric: "verifiedDonations",
-    threshold: 3,
-  },
-  {
-    id: "lifesaver",
-    category: "milestone",
-    metal: "gold",
-    icon: "award",
+    icon: "percent",
     metric: "verifiedDonations",
     threshold: 5,
   },
   {
-    id: "champion",
-    category: "milestone",
-    metal: "champion",
-    icon: "trophy",
+    id: "reward-10",
+    category: "reward",
+    metal: "silver",
+    icon: "stethoscope",
     metric: "verifiedDonations",
     threshold: 10,
   },
   {
-    id: "legend",
-    category: "milestone",
+    id: "reward-15",
+    category: "reward",
+    metal: "gold",
+    icon: "luggage",
+    metric: "verifiedDonations",
+    threshold: 15,
+  },
+  {
+    id: "reward-20",
+    category: "reward",
+    metal: "champion",
+    icon: "gift",
+    metric: "verifiedDonations",
+    threshold: 20,
+  },
+  {
+    id: "reward-25",
+    category: "reward",
     metal: "legend",
-    icon: "crown",
+    icon: "trophy",
     metric: "verifiedDonations",
     threshold: 25,
   },
 ];
+
+/** @deprecated use DONATION_REWARDS */
+export const MILESTONE_MEDALS = DONATION_REWARDS;
 
 export const HONOUR_MEDALS: MedalDefinition[] = [
   {
@@ -117,7 +125,7 @@ export const HONOUR_MEDALS: MedalDefinition[] = [
 ];
 
 export const ALL_MEDALS: MedalDefinition[] = [
-  ...MILESTONE_MEDALS,
+  ...DONATION_REWARDS,
   ...HONOUR_MEDALS,
 ];
 
@@ -135,7 +143,15 @@ export function evaluateMedals(activity: DonorActivity): MedalProgress[] {
 
 export function highestMilestone(medals: MedalProgress[]): MedalProgress | null {
   const earned = medals
-    .filter((medal) => medal.category === "milestone" && medal.earned)
+    .filter((medal) => medal.category === "reward" && medal.earned)
     .sort((a, b) => b.threshold - a.threshold);
   return earned[0] ?? null;
+}
+
+export function nextDonorReward(medals: MedalProgress[]): MedalProgress | null {
+  return (
+    medals
+      .filter((medal) => medal.category === "reward" && !medal.earned)
+      .sort((a, b) => a.threshold - b.threshold)[0] ?? null
+  );
 }

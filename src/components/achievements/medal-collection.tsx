@@ -9,6 +9,7 @@ import { MEDAL_COPY, MedalDetailModal } from "@/components/achievements/medal-de
 import {
   evaluateMedals,
   highestMilestone,
+  nextDonorReward,
   type MedalProgress,
 } from "@/lib/achievements";
 import type { DonorActivity } from "@/lib/donor-activity";
@@ -18,9 +19,12 @@ export function MedalCollection({ activity }: { activity: DonorActivity }) {
   const medals = useMemo(() => evaluateMedals(activity), [activity]);
   const [open, setOpen] = useState<MedalProgress | null>(null);
   const highest = highestMilestone(medals);
+  const nextReward = nextDonorReward(medals);
   const earnedCount = medals.filter((medal) => medal.earned).length;
-  const milestones = medals.filter((medal) => medal.category === "milestone");
+  const rewards = medals.filter((medal) => medal.category === "reward");
   const honours = medals.filter((medal) => medal.category === "honour");
+  const highestCopy = highest ? MEDAL_COPY[highest.id] : null;
+  const nextCopy = nextReward ? MEDAL_COPY[nextReward.id] : null;
 
   return (
     <section className="space-y-4">
@@ -39,13 +43,21 @@ export function MedalCollection({ activity }: { activity: DonorActivity }) {
             )}
             <div>
               <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-ink-muted">
-                {t("medals.highest")}
+                {highest ? t("medals.latestReward") : t("medals.nextReward")}
               </p>
               <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink">
-                {highest ? t(MEDAL_COPY[highest.id].name) : t("medals.noneYet")}
+                {highest
+                  ? t(highestCopy!.name)
+                  : nextCopy
+                    ? t(nextCopy.name)
+                    : t("medals.noneYet")}
               </h2>
               <p className="mt-1 text-sm font-semibold text-ink-muted">
-                {t("medals.verifiedCount", { n: activity.verifiedDonations })}
+                {highest && highestCopy?.perk
+                  ? t(highestCopy.perk)
+                  : nextCopy?.perk
+                    ? t(nextCopy.perk)
+                    : t("medals.verifiedCount", { n: activity.verifiedDonations })}
               </p>
             </div>
           </div>
@@ -68,10 +80,10 @@ export function MedalCollection({ activity }: { activity: DonorActivity }) {
               {t("medals.collection")}
             </p>
             <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight text-ink">
-              {t("medals.collectionTitle")}
+              {t("medals.rewardsTitle")}
             </h2>
             <p className="mt-1 text-sm font-semibold text-ink-muted">
-              {t("medals.collectionBody")}
+              {t("medals.rewardsBody")}
             </p>
           </div>
           <span className="rounded-full border border-crimson/20 bg-crimson-soft px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-crimson">
@@ -80,10 +92,10 @@ export function MedalCollection({ activity }: { activity: DonorActivity }) {
         </div>
 
         <p className="mt-5 text-[0.65rem] font-black uppercase tracking-[0.16em] text-ink-muted">
-          {t("medals.milestones")}
+          {t("medals.rewardsSection")}
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {milestones.map((medal) => (
+          {rewards.map((medal) => (
             <MedalCard
               key={medal.id}
               medal={medal}

@@ -33,12 +33,17 @@ export function MedalCard({
       <h3 className="mt-3 font-display text-base font-extrabold tracking-tight text-ink">
         {t(copy.name)}
       </h3>
-      <p className="mt-1 text-xs font-semibold text-ink-muted">
+        <p className="mt-1 text-xs font-semibold text-ink-muted">
         {t(copy.req)}
       </p>
+      {copy.perk ? (
+        <p className="mt-2 text-[0.7rem] font-bold leading-snug text-teal-deep">
+          {t(copy.perk)}
+        </p>
+      ) : null}
       {medal.earned ? (
         <span className="mt-3 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[0.6rem] font-black uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
-          {t("medals.earned")}
+          {medal.category === "reward" ? t("medals.unlocked") : t("medals.earned")}
         </span>
       ) : medal.current > 0 ? (
         <div className="mt-3 w-full">

@@ -7,10 +7,14 @@ import {
   Award,
   Crown,
   Droplets,
+  Gift,
   HeartHandshake,
   HeartPulse,
   Lock,
+  Luggage,
+  Percent,
   Shield,
+  Stethoscope,
   Trophy,
   Zap,
 } from "lucide-react";
@@ -42,6 +46,10 @@ const ICONS: Record<MedalIcon, typeof Droplets> = {
   zap: Zap,
   heart: HeartPulse,
   handshake: HeartHandshake,
+  gift: Gift,
+  stethoscope: Stethoscope,
+  luggage: Luggage,
+  percent: Percent,
 };
 
 export function MedalBadge({

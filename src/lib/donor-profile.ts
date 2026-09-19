@@ -67,8 +67,89 @@ function mapRow(row: DonorRow): DonorProfile {
   };
 }
 
-const DONOR_LIST_COLUMNS =
-  "id, full_name, blood_group, phone, email, city, area, lat, lng, available, last_donation, age, donations_completed, trust_score, lives_helped, avg_response_minutes, joined_at, telegram_chat_id, telegram_username";
+const DONOR_LIST_COLUMNS_BASE =
+  "id, full_name, blood_group, phone, email, city, area, available, last_donation, age, notes, donations_completed, trust_score, lives_helped, avg_response_minutes, joined_at, telegram_chat_id, telegram_username";
+
+const DONOR_LIST_COLUMNS_WITH_COORDS = `${DONOR_LIST_COLUMNS_BASE}, lat, lng`;
+
+const DONOR_LIST_COLUMNS_WITH_EMERGENCY = `${DONOR_LIST_COLUMNS_WITH_COORDS}, emergency_voice_calls, phone_verified`;
+
+const DONOR_SELECT_TRIES = [
+  DONOR_LIST_COLUMNS_WITH_EMERGENCY,
+  DONOR_LIST_COLUMNS_WITH_COORDS,
+  DONOR_LIST_COLUMNS_BASE,
+];
+
+const DONOR_SINGLE_SELECT_TRIES = [
+  `${DONOR_LIST_COLUMNS_WITH_EMERGENCY}, updated_at`,
+  `${DONOR_LIST_COLUMNS_WITH_COORDS}, updated_at`,
+  `${DONOR_LIST_COLUMNS_BASE}, updated_at`,
+];
+
+function isMissingColumnError(error: { message?: string } | null) {
+  if (!error?.message) return false;
+  return /column|does not exist|42703|schema cache/i.test(error.message);
+}
+
+async function selectDonorProfiles<T>(
+  run: (columns: string) => PromiseLike<{
+    data: unknown;
+    error: { message: string } | null;
+    count?: number | null;
+  }>,
+): Promise<{ data: T | null; error: { message: string } | null; count: number | null }> {
+  let last: {
+    data: T | null;
+    error: { message: string } | null;
+    count: number | null;
+  } = { data: null, error: { message: "select failed" }, count: null };
+
+  for (const columns of DONOR_SELECT_TRIES) {
+    const raw = await run(columns);
+    last = {
+      data: (raw.data as T | null) ?? null,
+      error: raw.error,
+      count: raw.count ?? null,
+    };
+    if (!last.error) return last;
+    if (!isMissingColumnError(last.error)) return last;
+  }
+  return last;
+}
+
+async function selectDonorProfileRow(
+  supabase: QueryClient,
+  userId: string,
+): Promise<DonorRow | null> {
+  for (const columns of DONOR_SINGLE_SELECT_TRIES) {
+    const { data, error } = await supabase
+      .from("donor_profiles")
+      .select(columns)
+      .eq("id", userId)
+      .maybeSingle();
+    if (!error && data) return data as DonorRow;
+    if (error && !isMissingColumnError(error)) return null;
+  }
+  return null;
+}
+
+type DonorUpsertPayload = Record<string, unknown>;
+
+function donorUpsertVariants(payload: DonorUpsertPayload): DonorUpsertPayload[] {
+  const withoutCoords = { ...payload };
+  delete withoutCoords.lat;
+  delete withoutCoords.lng;
+
+  const withoutEmergency = { ...payload };
+  delete withoutEmergency.emergency_voice_calls;
+  delete withoutEmergency.phone_verified;
+
+  const withoutBoth = { ...withoutCoords };
+  delete withoutBoth.emergency_voice_calls;
+  delete withoutBoth.phone_verified;
+
+  return [payload, withoutCoords, withoutEmergency, withoutBoth];
+}
 
 type QueryClient = {
   from: (table: string) => any;
@@ -79,12 +160,15 @@ export async function queryAvailableDonorPage(
   params: { offset: number; limit: number },
 ): Promise<PageResult<DonorProfile>> {
   const to = params.offset + params.limit - 1;
-  const { data, error, count } = await supabase
-    .from("donor_profiles")
-    .select(DONOR_LIST_COLUMNS, { count: "exact" })
-    .eq("available", true)
-    .order("joined_at", { ascending: false })
-    .range(params.offset, to);
+  const { data, error, count } = await selectDonorProfiles<DonorRow[]>(
+    (columns) =>
+      supabase
+        .from("donor_profiles")
+        .select(columns, { count: "exact" })
+        .eq("available", true)
+        .order("joined_at", { ascending: false })
+        .range(params.offset, to),
+  );
 
   if (error || !data) {
     return emptyPage(params.offset, params.limit);
@@ -145,14 +229,9 @@ export async function fetchDonorProfile(
   }
   if (!id) return null;
 
-  const { data, error } = await supabase
-    .from("donor_profiles")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  const profile = mapRow(data as DonorRow);
+  const data = await selectDonorProfileRow(supabase, id);
+  if (!data) return null;
+  const profile = mapRow(data);
   return createdAfterReset(profile.joinedAt) ? profile : null;
 }
 
@@ -258,40 +337,31 @@ export async function saveDonorProfile(
     phone_verified: input.phoneVerified !== false,
   };
 
-  let { data, error } = await supabase
-    .from("donor_profiles")
-    .upsert(payload, { onConflict: "id" })
-    .select("*")
-    .single();
+  let data: DonorRow | null = null;
+  let lastError: { message: string } | null = null;
 
-  if (error && /lat|lng/i.test(error.message)) {
-    const { lat: _lat, lng: _lng, ...withoutCoords } = payload;
-    const retry = await supabase
-      .from("donor_profiles")
-      .upsert(withoutCoords, { onConflict: "id" })
-      .select("*")
-      .single();
-    data = retry.data;
-    error = retry.error;
+  outer: for (const body of donorUpsertVariants(payload)) {
+    for (const columns of DONOR_SINGLE_SELECT_TRIES) {
+      const attempt = await supabase
+        .from("donor_profiles")
+        .upsert(body, { onConflict: "id" })
+        .select(columns)
+        .single();
+      if (!attempt.error && attempt.data) {
+        data = attempt.data as unknown as DonorRow;
+        lastError = null;
+        break outer;
+      }
+      lastError = attempt.error;
+      if (attempt.error && !isMissingColumnError(attempt.error)) break outer;
+    }
   }
 
-  if (error && /emergency_voice_calls|phone_verified/i.test(error.message)) {
-    const { emergency_voice_calls: _ev, phone_verified: _pv, ...withoutEmergency } =
-      payload;
-    const retry = await supabase
-      .from("donor_profiles")
-      .upsert(withoutEmergency, { onConflict: "id" })
-      .select("*")
-      .single();
-    data = retry.data;
-    error = retry.error;
+  if (!data) {
+    throw new Error(lastError?.message || "Could not save donor profile.");
   }
 
-  if (error || !data) {
-    throw new Error(error?.message || "Could not save donor profile.");
-  }
-
-  return mapRow(data as DonorRow);
+  return mapRow(data);
 }
 
 export async function updateDonorAvailability(

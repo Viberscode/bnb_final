@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Hospital as HospitalIcon, Loader2, MapPin, Navigation } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
 import {
@@ -62,12 +62,20 @@ export function HospitalSearchPicker({
   const [mapPins, setMapPins] = useState<PickedHospital[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [fillFlash, setFillFlash] = useState(false);
+  const lastFetchAt = useRef<{ lat: number; lng: number } | null>(null);
   const mapHospital = value;
-  const mapCenter = mapHospital
-    ? { lat: mapHospital.lat, lng: mapHospital.lng }
-    : userCoords
-      ? { lat: userCoords.lat, lng: userCoords.lng }
+  const mapCenter = userCoords
+    ? { lat: userCoords.lat, lng: userCoords.lng }
+    : mapHospital
+      ? { lat: mapHospital.lat, lng: mapHospital.lng }
       : HOSPITAL_MAP_DEFAULT_CENTER;
+
+  const nearest = useMemo(() => {
+    const ranked = mapPins
+      .filter((item) => typeof item.distanceKm === "number")
+      .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
+    return ranked[0] ?? null;
+  }, [mapPins]);
 
   useEffect(() => {
     if (value?.name && value.name !== query) {
@@ -133,18 +141,36 @@ export function HospitalSearchPicker({
   }, [query, userCoords?.lat, userCoords?.lng]);
 
   useEffect(() => {
+    if (!userCoords) return;
+    setMapPins((prev) =>
+      prev
+        .map((item) => withDistance(item, userCoords))
+        .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99)),
+    );
+  }, [userCoords?.lat, userCoords?.lng]);
+
+  useEffect(() => {
+    const origin = userCoords ?? mapCenter;
+    const prev = lastFetchAt.current;
+    if (prev) {
+      const movedM = distanceKm(prev.lat, prev.lng, origin.lat, origin.lng) * 1000;
+      if (movedM < 250) return;
+    }
+
     const controller = new AbortController();
     let active = true;
     setMapLoading(true);
+    lastFetchAt.current = { lat: origin.lat, lng: origin.lng };
 
-    const origin = userCoords ?? mapCenter;
-    const local = DEMO_HOSPITALS.map((item) => withDistance(item, origin)).filter(
-      (item) =>
-        typeof item.distanceKm !== "number" ||
-        item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
-    );
+    const local = DEMO_HOSPITALS.map((item) => withDistance(item, origin))
+      .filter(
+        (item) =>
+          typeof item.distanceKm !== "number" ||
+          item.distanceKm <= NEARBY_HOSPITAL_RADIUS_KM,
+      )
+      .sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
 
-    setMapPins((prev) => {
+    setMapPins(() => {
       const selected =
         value && !local.some((item) => item.id === value.id)
           ? [withDistance(value, origin)]
@@ -175,6 +201,7 @@ export function HospitalSearchPicker({
           seen.add(key);
           merged.push(item);
         }
+        merged.sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99));
         if (active) setMapPins(merged);
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
@@ -303,6 +330,10 @@ export function HospitalSearchPicker({
             {t("request.hospitalMap")}
             {mapLoading ? (
               <Loader2 className="size-3 animate-spin text-teal/70" aria-hidden />
+            ) : nearest ? (
+              <span className="normal-case tracking-normal text-teal">
+                · {t("request.hospitalNearestLive")}
+              </span>
             ) : null}
           </p>
           {mapHospital ? (
@@ -316,11 +347,33 @@ export function HospitalSearchPicker({
             <p className="text-xs text-ink-muted">{t("request.hospitalMapHint")}</p>
           )}
         </div>
+        {nearest ? (
+          <button
+            type="button"
+            onClick={() => pick(nearest, true)}
+            className="flex w-full items-center justify-between gap-3 border-b border-teal/10 bg-teal-soft/60 px-3 py-2 text-left hover:bg-teal-soft"
+          >
+            <span className="min-w-0">
+              <span className="block text-[0.65rem] font-black uppercase tracking-[0.16em] text-teal-deep">
+                {t("request.hospitalNearest")}
+              </span>
+              <span className="block truncate text-sm font-bold text-ink">
+                {nearest.name}
+              </span>
+            </span>
+            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black tabular-nums text-teal-deep">
+              {typeof nearest.distanceKm === "number"
+                ? formatDistance(nearest.distanceKm)
+                : t("request.hospitalUseNearest")}
+            </span>
+          </button>
+        ) : null}
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-[#e8f4f2]">
           <HospitalLiveMap
             center={mapCenter}
             hospitals={mapPins}
             selectedId={value?.id}
+            nearestId={nearest?.id}
             userLocation={userCoords ?? null}
             onSelect={(hospital) => pick(hospital, true)}
           />

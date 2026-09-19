@@ -26,6 +26,7 @@ import {
   type PickedHospital,
 } from "@/components/request-help/hospital-search-picker";
 import { RequesterConfirmPanel } from "@/components/request-help/requester-confirm-panel";
+import { EscalationStatusPanel } from "@/components/emergency/escalation-status-panel";
 import { BloodGroupMark, BloodGroupText } from "@/components/request-help/blood-group-mark";
 import { VoiceNoteRecorder } from "@/components/request-help/voice-note-recorder";
 import { URGENCY_OPTIONS } from "@/data/demo";
@@ -434,6 +435,11 @@ export function RequestHelpForm() {
                   assignment={liveActive.assignment}
                   viewer="requester"
                   requestId={liveActive.id}
+                />
+                <EscalationStatusPanel
+                  requestId={liveActive.id}
+                  urgency={liveActive.urgency}
+                  verificationStatus={liveActive.verificationStatus}
                 />
                 <RequesterConfirmPanel
                   request={liveActive}

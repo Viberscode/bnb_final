@@ -62,6 +62,8 @@ export interface BloodRequest {
   distanceKm?: number;
   isDemo?: boolean;
   assignment?: DonorAssignment;
+  verificationStatus?: "pending" | "verified" | "rejected";
+  verifiedAt?: string;
 }
 
 export type AssignmentStatus =
@@ -112,6 +114,9 @@ export interface DonorProfile {
   joinedAt: string;
   telegramChatId?: string;
   telegramUsername?: string;
+  /** Opt-in for automated critical emergency voice calls (server-side only). */
+  emergencyVoiceCalls?: boolean;
+  phoneVerified?: boolean;
 }
 
 export interface NgoProfile {

@@ -133,6 +133,7 @@ export function BecomeDonorForm() {
   const [lng, setLng] = useState<number | undefined>();
   const [readingAddress, setReadingAddress] = useState(false);
   const [available, setAvailable] = useState(true);
+  const [emergencyVoiceCalls, setEmergencyVoiceCalls] = useState(false);
   const [lastDonation, setLastDonation] = useState("");
   const [age, setAge] = useState("");
   const [notes, setNotes] = useState("");
@@ -174,6 +175,7 @@ export function BecomeDonorForm() {
         }
       }
       setAvailable(existing.available);
+      setEmergencyVoiceCalls(existing.emergencyVoiceCalls === true);
       setLastDonation(existing.lastDonation ?? "");
       setAge(existing.age ? String(existing.age) : "");
       setNotes(existing.notes ?? "");
@@ -276,6 +278,8 @@ export function BecomeDonorForm() {
         lat,
         lng,
         available,
+        emergencyVoiceCalls,
+        phoneVerified: mobile.length === 10,
         lastDonation: lastDonation || undefined,
         age: age ? Number(age) : undefined,
         notes,
@@ -602,6 +606,39 @@ export function BecomeDonorForm() {
               className={cn(
                 "absolute top-1 size-6 rounded-full bg-white shadow transition",
                 available ? "left-7" : "left-1",
+              )}
+            />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setEmergencyVoiceCalls((v) => !v)}
+          className={cn(
+            "mt-3 flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition",
+            emergencyVoiceCalls
+              ? "border-[#c4122f]/40 bg-[#fff5f6]"
+              : "border-slate-200 bg-white",
+          )}
+        >
+          <span>
+            <span className="block font-display text-lg font-extrabold text-ink">
+              Emergency voice calls
+            </span>
+            <span className="mt-0.5 block text-sm text-ink-muted">
+              Allow automated phone alerts for verified critical blood emergencies only.
+            </span>
+          </span>
+          <span
+            className={cn(
+              "relative h-8 w-14 rounded-full transition",
+              emergencyVoiceCalls ? "bg-[#c4122f]" : "bg-slate-300",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-1 size-6 rounded-full bg-white shadow transition",
+                emergencyVoiceCalls ? "left-7" : "left-1",
               )}
             />
           </span>

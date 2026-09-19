@@ -10,6 +10,7 @@ import {
   type PageParams,
   type PageResult,
 } from "@/lib/pagination";
+import { initialVerificationStatus } from "@/lib/emergency/verification";
 import { tryCreateClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -46,6 +47,8 @@ type BloodRequestRow = {
   status: string;
   distance_km: number | null;
   created_at: string;
+  verification_status?: string | null;
+  verified_at?: string | null;
 };
 
 const VOICE_MARKER = "[[VOICE]]";
@@ -219,6 +222,9 @@ function mapRow(row: BloodRequestRow): BloodRequest {
     createdAt: row.created_at,
     distanceKm: row.distance_km ?? undefined,
     isDemo: false,
+    verificationStatus:
+      (row.verification_status as BloodRequest["verificationStatus"]) ?? undefined,
+    verifiedAt: row.verified_at ?? undefined,
   };
 }
 
@@ -565,6 +571,9 @@ export async function createLiveRequestForUser(
     input.hospitalLng,
   );
   const notesWithMeta = [input.notes?.trim(), needMeta].filter(Boolean).join("\n") || null;
+  const verificationStatus = initialVerificationStatus(input.urgency);
+  const verifiedAt =
+    verificationStatus === "verified" ? new Date().toISOString() : null;
 
   const fullPayload = {
     user_id: userId,
@@ -587,6 +596,8 @@ export async function createLiveRequestForUser(
     group_units: input.groupUnits ?? {},
     status: "matching",
     distance_km: input.distanceKm ?? null,
+    verification_status: verificationStatus,
+    verified_at: verifiedAt,
   };
 
   const metaPayload = {
@@ -606,6 +617,8 @@ export async function createLiveRequestForUser(
     group_units: fullPayload.group_units,
     status: fullPayload.status,
     distance_km: fullPayload.distance_km,
+    verification_status: verificationStatus,
+    verified_at: verifiedAt,
   };
 
   const voiceInNotes = input.voiceNoteUrl
@@ -716,6 +729,15 @@ export async function cancelLiveRequest(requestId: string): Promise<void> {
 
   if (error) {
     throw new Error(error.message || "Could not cancel this request.");
+  }
+
+  try {
+    const { cancelEmergencyEscalation } = await import(
+      "@/lib/emergency/escalation-service"
+    );
+    await cancelEmergencyEscalation(requestId);
+  } catch {
+    /* optional service role */
   }
 
   if (typeof window !== "undefined") {

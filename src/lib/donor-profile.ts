@@ -34,6 +34,8 @@ type DonorRow = {
   joined_at: string;
   telegram_chat_id?: string | null;
   telegram_username?: string | null;
+  emergency_voice_calls?: boolean | null;
+  phone_verified?: boolean | null;
 };
 
 function mapRow(row: DonorRow): DonorProfile {
@@ -60,6 +62,8 @@ function mapRow(row: DonorRow): DonorProfile {
     joinedAt: row.joined_at,
     telegramChatId: row.telegram_chat_id ?? undefined,
     telegramUsername: row.telegram_username ?? undefined,
+    emergencyVoiceCalls: row.emergency_voice_calls === true,
+    phoneVerified: row.phone_verified !== false,
   };
 }
 
@@ -250,6 +254,8 @@ export async function saveDonorProfile(
     avg_response_minutes: avgResponseMinutes ?? 0,
     joined_at: joinedAt,
     updated_at: new Date().toISOString(),
+    emergency_voice_calls: input.emergencyVoiceCalls === true,
+    phone_verified: input.phoneVerified !== false,
   };
 
   let { data, error } = await supabase
@@ -263,6 +269,18 @@ export async function saveDonorProfile(
     const retry = await supabase
       .from("donor_profiles")
       .upsert(withoutCoords, { onConflict: "id" })
+      .select("*")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
+  if (error && /emergency_voice_calls|phone_verified/i.test(error.message)) {
+    const { emergency_voice_calls: _ev, phone_verified: _pv, ...withoutEmergency } =
+      payload;
+    const retry = await supabase
+      .from("donor_profiles")
+      .upsert(withoutEmergency, { onConflict: "id" })
       .select("*")
       .single();
     data = retry.data;

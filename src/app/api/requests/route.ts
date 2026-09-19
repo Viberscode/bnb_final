@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { routeVerifiedRequestNotifications } from "@/lib/emergency/escalation-service";
 import { createLiveRequestForUser, type LiveRequestInput } from "@/lib/live-requests";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -91,6 +92,9 @@ export async function POST(request: Request) {
 
   try {
     const item = await createLiveRequestForUser(supabase, user.id, input);
+    if (item.verificationStatus === "verified") {
+      await routeVerifiedRequestNotifications(item.id, new URL(request.url).origin);
+    }
     return NextResponse.json({ item });
   } catch (err) {
     const message =

@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { fetchNgoProfile, subscribeNgoProfile } from "@/lib/ngo-profile";
+import { NgoCriticalVerifyPanel } from "@/components/emergency/ngo-critical-verify-panel";
 import type { NgoProfile } from "@/types";
 
 export default function NgoProfilePage() {
@@ -117,6 +118,8 @@ export default function NgoProfilePage() {
                   </div>
                 </div>
               </section>
+
+              {user ? <NgoCriticalVerifyPanel ngoUserId={user.id} /> : null}
 
               <dl className="grid gap-3 sm:grid-cols-2">
                 {(

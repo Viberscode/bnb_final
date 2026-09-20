@@ -17,7 +17,9 @@ import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
   fetchRequestsAssignedToDonor,
+  applyStaleLiveClosures,
   isActiveRequestStatus,
+  isFreshLiveRequest,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
 import type { BloodRequest, DonorProfile } from "@/types";
@@ -37,18 +39,13 @@ export function DonorMatchAlert() {
   const closedKeys = useRef(new Set<string>());
   const { coords: liveCoords } = useDonorLiveCoords(donor);
 
-  const pool = useMemo(() => {
-    if (!donor) return donors;
-    return donors.some((item) => item.id === donor.id)
-      ? donors
-      : [...donors, donor];
-  }, [donor, donors]);
-
   const match = useMemo(() => {
     if (!donor) return null;
     const live = requests.filter(
       (request) =>
-        isActiveRequestStatus(request.status) && !isOwnDonor(request, donor),
+        isActiveRequestStatus(request.status) &&
+        isFreshLiveRequest(request.createdAt) &&
+        !isOwnDonor(request, donor),
     );
     return (
       live.find((request) => isAssignedDonor(request, donor.id)) ??
@@ -90,9 +87,11 @@ export function DonorMatchAlert() {
           ? [...nextDonors, profile]
           : nextDonors;
 
-      const synced = await syncAssignments(rows, nextPool, {
-        allowCreate: false,
-      });
+      const synced = applyStaleLiveClosures(
+        await syncAssignments(rows, nextPool, {
+          allowCreate: false,
+        }),
+      );
 
       if (!active) return;
       setDonor(profile);

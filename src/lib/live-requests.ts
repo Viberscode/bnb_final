@@ -18,12 +18,52 @@ export const LIVE_REQUESTS_EVENT = "bloodkit:live-requests";
 
 /** Public live feed only shows requests from the last 24 hours. */
 export const LIVE_REQUEST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Donor popups and “still live” matching only last five minutes. */
+export const FRESH_LIVE_REQUEST_MS = 5 * 60 * 1000;
 
 export function isWithinLiveWindow(iso?: string | null, now = Date.now()) {
   if (!iso) return false;
   const created = new Date(iso).getTime();
   if (!Number.isFinite(created)) return false;
   return now - created <= LIVE_REQUEST_MAX_AGE_MS;
+}
+
+export function isFreshLiveRequest(iso?: string | null, now = Date.now()) {
+  if (!iso) return false;
+  const created = new Date(iso).getTime();
+  if (!Number.isFinite(created)) return false;
+  return now - created <= FRESH_LIVE_REQUEST_MS;
+}
+
+function closeIfStale(request: BloodRequest): BloodRequest {
+  if (!isActiveRequestStatus(request.status)) return request;
+  if (isFreshLiveRequest(request.createdAt)) return request;
+  return { ...request, status: "completed" };
+}
+
+async function persistStaleCompleted(ids: string[]) {
+  if (!ids.length) return;
+  const supabase = tryCreateClient();
+  if (!supabase || !isSupabaseConfigured()) return;
+  await supabase
+    .from("blood_requests")
+    .update({ status: "completed" })
+    .in("id", ids)
+    .in("status", ACTIVE_REQUEST_STATUSES);
+}
+
+/** Older live requests are treated as done after five minutes. */
+export function applyStaleLiveClosures(requests: BloodRequest[]): BloodRequest[] {
+  const closed: string[] = [];
+  const next = requests.map((request) => {
+    const mapped = closeIfStale(request);
+    if (mapped !== request && mapped.status === "completed") {
+      closed.push(request.id);
+    }
+    return mapped;
+  });
+  if (closed.length) void persistStaleCompleted(closed);
+  return next;
 }
 
 type BloodRequestRow = {
@@ -326,9 +366,11 @@ export async function queryLiveRequestPage(
   }
 
   const rows = (data as BloodRequestRow[] | null) ?? [];
-  const mapped = rows
-    .map(mapRow)
-    .filter((request) => createdAfterReset(request.createdAt));
+  const mapped = applyStaleLiveClosures(
+    rows
+      .map(mapRow)
+      .filter((request) => createdAfterReset(request.createdAt)),
+  );
   return pageFromRows(mapped, params, count ?? null);
 }
 
@@ -390,7 +432,10 @@ export async function queryActiveRequestForUser(
 
   if (error || !data) return null;
   const request = mapRow(data as BloodRequestRow);
-  return createdAfterReset(request.createdAt) ? request : null;
+  if (!createdAfterReset(request.createdAt)) return null;
+  const [closed] = applyStaleLiveClosures([request]);
+  if (!closed || !isActiveRequestStatus(closed.status)) return null;
+  return closed;
 }
 
 async function fetchJsonPage<T>(
@@ -489,7 +534,9 @@ export async function fetchRequestById(
 
   if (error || !data) return null;
   const request = mapRow(data as BloodRequestRow);
-  return createdAfterReset(request.createdAt) ? request : null;
+  if (!createdAfterReset(request.createdAt)) return null;
+  const [closed] = applyStaleLiveClosures([request]);
+  return closed ?? null;
 }
 
 /** Returns the user's current open request, if any. */

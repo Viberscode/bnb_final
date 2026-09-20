@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   fetchLiveRequests,
+  isActiveRequestStatus,
+  isFreshLiveRequest,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
 
@@ -14,7 +16,15 @@ export function useHasLiveRequests() {
 
     const refresh = async () => {
       const rows = await fetchLiveRequests();
-      if (active) setHasLive(rows.length > 0);
+      if (active) {
+        setHasLive(
+          rows.some(
+            (request) =>
+              isActiveRequestStatus(request.status) &&
+              isFreshLiveRequest(request.createdAt),
+          ),
+        );
+      }
     };
 
     void refresh();

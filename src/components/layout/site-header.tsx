@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useSignInPrompt } from "@/components/auth/sign-in-prompt";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { BrandLogo } from "@/components/brand-mark";
+import { useHasLiveRequests } from "@/hooks/use-has-live-requests";
 import { fetchNgoProfile, subscribeNgoProfile } from "@/lib/ngo-profile";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ interface SiteHeaderProps {
 }
 
 const NAV_KEYS = [
-  ["#network", "nav.network"],
+  ["/partners", "nav.partners"],
   ["/requests", "nav.liveRequests"],
   ["#how-it-works", "nav.howItWorks"],
   ["#compatibility", "nav.compatibility"],
@@ -33,6 +34,7 @@ export function SiteHeader({
   const { user, status, signOut } = useAuth();
   const { openSignIn, requireAuth } = useSignInPrompt();
   const { t } = useLanguage();
+  const hasLiveRequests = useHasLiveRequests();
   const [ngoName, setNgoName] = useState<string | null>(null);
   const displayName =
     ngoName ||
@@ -90,11 +92,14 @@ export function SiteHeader({
             const active =
               href === "/requests"
                 ? pathname.startsWith("/requests")
-                : false;
+                : href === "/partners"
+                  ? pathname.startsWith("/partners")
+                  : false;
             const classNameNav = cn(
               "nav-chip",
               active && "nav-chip--active",
               !isSolid && !active && "nav-chip--ghost",
+              href === "/requests" && hasLiveRequests && "nav-chip--live",
             );
 
             return href.startsWith("/") && !href.startsWith("/#") ? (

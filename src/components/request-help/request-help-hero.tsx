@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { ArrowUpRight, Radio } from "lucide-react";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { useHasLiveRequests } from "@/hooks/use-has-live-requests";
+import { cn } from "@/lib/utils";
 
 export function RequestHelpHero() {
   const { t } = useLanguage();
+  const hasLive = useHasLiveRequests();
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -32,7 +35,10 @@ export function RequestHelpHero() {
 
       <Link
         href="/requests"
-        className="shiny-card group inline-flex w-fit shrink-0 items-center gap-2.5 overflow-hidden rounded-xl bg-gradient-to-br from-white to-rose-50 px-3.5 py-2.5 ring-1 ring-rose-200/80 shadow-[0_12px_28px_-18px_rgba(196,18,47,0.4)] transition hover:-translate-y-0.5"
+        className={cn(
+          "shiny-card group relative inline-flex w-fit shrink-0 items-center gap-2.5 overflow-hidden rounded-xl bg-gradient-to-br from-white to-rose-50 px-3.5 py-2.5 ring-1 ring-rose-200/80 shadow-[0_12px_28px_-18px_rgba(196,18,47,0.4)] transition hover:-translate-y-0.5",
+          hasLive && "nav-chip--live",
+        )}
       >
         <span className="inline-flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ff4d6d] to-[#8e0c22] text-white">
           <Radio className="size-3.5 animate-pulse" aria-hidden />

@@ -50,6 +50,11 @@ export function SiteFooter() {
               </AuthGateLink>
             </li>
             <li>
+              <Link href="/partners" className="transition hover:text-white">
+                {t("nav.partners")}
+              </Link>
+            </li>
+            <li>
               <Link href="/requests" className="transition hover:text-white">
                 {t("footer.activeRequests")}
               </Link>

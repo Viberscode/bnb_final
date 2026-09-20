@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AssignedRequesterDetails } from "@/components/request-help/assigned-requester-details";
 import { useDonorLiveCoords } from "@/hooks/use-donor-live-coords";
+import { donorMatchesRequest } from "@/lib/blood-compatibility";
 import {
   isAssignedDonor,
   isOwnDonor,
+  offerAssignmentToDonor,
   respondToAssignment,
   subscribeAssignments,
   syncAssignments,
@@ -15,6 +17,7 @@ import { fetchAvailableDonors, fetchDonorProfile } from "@/lib/donor-profile";
 import {
   fetchLiveRequests,
   fetchRequestsAssignedToDonor,
+  isActiveRequestStatus,
   subscribeLiveRequests,
 } from "@/lib/live-requests";
 import type { BloodRequest, DonorProfile } from "@/types";
@@ -24,16 +27,6 @@ function matchKey(request: BloodRequest) {
   return `${request.id}|${assignment?.donorId ?? ""}|${assignment?.assignedAt ?? ""}`;
 }
 
-function wasDismissed(key: string) {
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem("bloodkit-dismissed-match") === key;
-}
-
-function rememberDismissed(key: string) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem("bloodkit-dismissed-match", key);
-}
-
 export function DonorMatchAlert() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<BloodRequest[]>([]);
@@ -41,6 +34,7 @@ export function DonorMatchAlert() {
   const [donor, setDonor] = useState<DonorProfile | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const closedKeys = useRef(new Set<string>());
   const { coords: liveCoords } = useDonorLiveCoords(donor);
 
   const pool = useMemo(() => {
@@ -52,11 +46,17 @@ export function DonorMatchAlert() {
 
   const match = useMemo(() => {
     if (!donor) return null;
+    const live = requests.filter(
+      (request) =>
+        isActiveRequestStatus(request.status) && !isOwnDonor(request, donor),
+    );
     return (
-      requests.find(
-        (request) =>
-          isAssignedDonor(request, donor.id) && !isOwnDonor(request, donor),
-      ) ?? null
+      live.find((request) => isAssignedDonor(request, donor.id)) ??
+      live.find((request) =>
+        donorMatchesRequest(donor.bloodGroup, request),
+      ) ??
+      live[0] ??
+      null
     );
   }, [requests, donor, tick]);
 
@@ -90,7 +90,6 @@ export function DonorMatchAlert() {
           ? [...nextDonors, profile]
           : nextDonors;
 
-      // Donor clients only consume remote matches — never invent new ones.
       const synced = await syncAssignments(rows, nextPool, {
         allowCreate: false,
       });
@@ -122,12 +121,23 @@ export function DonorMatchAlert() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!match || !donor) return;
+    if (isAssignedDonor(match, donor.id)) return;
+    const next = offerAssignmentToDonor(match, donor, { force: true });
+    if (next.assignment?.donorId === donor.id) {
+      setRequests((rows) =>
+        rows.map((row) => (row.id === next.id ? next : row)),
+      );
+    }
+  }, [match?.id, donor?.id]);
+
+  useEffect(() => {
     if (!match) {
       setOpenKey(null);
       return;
     }
     const key = matchKey(match);
-    if (wasDismissed(key)) return;
+    if (closedKeys.current.has(key)) return;
     setOpenKey(key);
   }, [match]);
 
@@ -144,21 +154,24 @@ export function DonorMatchAlert() {
         lng: liveCoords?.lng ?? donor.lng,
       }}
       onClose={() => {
-        rememberDismissed(openKey);
+        closedKeys.current.add(openKey);
         setOpenKey(null);
       }}
       onAccept={() => {
+        const offered = offerAssignmentToDonor(openRequest, donor, {
+          force: true,
+        });
         void respondToAssignment(
-          openRequest.id,
+          offered.id,
           donor.id,
           "accept",
-          openRequest.userId,
+          offered.userId,
         ).then(() => {
           setTick((value) => value + 1);
         });
       }}
       onDecline={() => {
-        rememberDismissed(openKey);
+        closedKeys.current.add(openKey);
         setOpenKey(null);
         void respondToAssignment(
           openRequest.id,

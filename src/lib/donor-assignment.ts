@@ -694,18 +694,21 @@ export async function startAssignmentForRequest(
 export function offerAssignmentToDonor(
   request: BloodRequest,
   donor: DonorProfile,
+  options?: { force?: boolean },
 ): BloodRequest {
   if (isOwnDonor(request, donor)) return request;
   if (!isActiveRequestStatus(request.status) && request.status !== "completed") {
     return request;
   }
-  if (!donor.available) return request;
-  if (!donorMatchesRequest(donor.bloodGroup, request)) return request;
+  if (!donor.available && !options?.force) return request;
+  if (!donorMatchesRequest(donor.bloodGroup, request) && !options?.force) {
+    return request;
+  }
 
   const store = readMergedStore();
   const current = store[request.id];
   const declined = current?.declinedDonorIds ?? [];
-  if (declined.includes(donor.id)) {
+  if (!options?.force && declined.includes(donor.id)) {
     return { ...request, assignment: current };
   }
 
@@ -717,6 +720,7 @@ export function offerAssignmentToDonor(
   }
 
   if (
+    !options?.force &&
     current?.donorId &&
     current.donorId !== donor.id &&
     (current.status === "pending" || current.status === "accepted") &&

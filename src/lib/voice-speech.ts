@@ -106,7 +106,9 @@ export function createVoiceIo() {
     stopListening();
 
     await new Promise<void>((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(text);
+      const spoken =
+        lang === "hi" ? text : text.replace(/\blive\b/gi, "lyve");
+      const utterance = new SpeechSynthesisUtterance(spoken);
       utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
       utterance.rate = lang === "hi" ? 1.05 : 1.08;
       utterance.pitch = 1;

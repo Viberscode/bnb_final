@@ -11,13 +11,10 @@ import { BloodKitHeading } from "@/components/landing/bloodkit-heading";
 import { HeroHelpStory } from "@/components/landing/hero-help-story";
 import { HeroLifeBackdrop } from "@/components/landing/hero-life-backdrop";
 import { VoiceRequestAssistant } from "@/components/landing/voice-request-assistant";
-import { NgoDirectoryModal } from "@/components/ngo/ngo-directory-modal";
 import {
   fetchNgoProfile,
-  fetchRegisteredNgos,
   subscribeNgoProfile,
 } from "@/lib/ngo-profile";
-import type { NgoProfile } from "@/types";
 import { cn } from "@/lib/utils";
 
 function HeartBloodIcon({ className }: { className?: string }) {
@@ -233,8 +230,6 @@ export function LandingHero() {
   const { t } = useLanguage();
   const { user, status: authStatus } = useAuth();
   const [ngoName, setNgoName] = useState<string | null>(null);
-  const [ngoDirectoryOpen, setNgoDirectoryOpen] = useState(false);
-  const [registeredNgos, setRegisteredNgos] = useState<NgoProfile[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
@@ -253,16 +248,6 @@ export function LandingHero() {
       unsub();
     };
   }, [user?.id]);
-
-  useEffect(() => {
-    let active = true;
-    void fetchRegisteredNgos().then((list) => {
-      if (active) setRegisteredNgos(list);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -325,8 +310,7 @@ export function LandingHero() {
                 type="button"
                 onClick={() => {
                   if (action.role === "ngo") {
-                    void fetchRegisteredNgos().then(setRegisteredNgos);
-                    setNgoDirectoryOpen(true);
+                    router.push("/partners");
                     return;
                   }
                   if (requireAuth(action.href, t(
@@ -422,13 +406,6 @@ export function LandingHero() {
         title={t("hero.voiceTitle")}
         subtitle={t("hero.voiceSub")}
       />
-
-      {ngoDirectoryOpen ? (
-        <NgoDirectoryModal
-          ngos={registeredNgos}
-          onClose={() => setNgoDirectoryOpen(false)}
-        />
-      ) : null}
 
       {voiceOpen ? (
         <VoiceRequestAssistant

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Nunito } from "next/font/google";
 import {
   ArrowUpRight,
   Hospital as HospitalIcon,
@@ -43,6 +44,12 @@ import {
 } from "@/lib/voice-request-parse";
 import { createVoiceIo, hasVoiceRecognition } from "@/lib/voice-speech";
 import type { BloodGroup, Hospital, UrgencyLevel } from "@/types";
+
+const stepFont = Nunito({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  display: "swap",
+});
 
 type NearbyHospital = Hospital & { distanceKm: number };
 type AskField =
@@ -86,42 +93,6 @@ const EMPTY_DRAFT: VoiceDraft = {
   notes: "",
 };
 
-const GROUP_SAY: Record<Locale, Record<BloodGroup, string>> = {
-  en: {
-    "A+": "A positive",
-    "A-": "A negative",
-    "B+": "B positive",
-    "B-": "B negative",
-    "AB+": "A B positive",
-    "AB-": "A B negative",
-    "O+": "O positive",
-    "O-": "O negative",
-  },
-  hi: {
-    "A+": "ए पॉजिटिव",
-    "A-": "ए नेगेटिव",
-    "B+": "बी पॉजिटिव",
-    "B-": "बी नेगेटिव",
-    "AB+": "ए बी पॉजिटिव",
-    "AB-": "ए बी नेगेटिव",
-    "O+": "ओ पॉजिटिव",
-    "O-": "ओ नेगेटिव",
-  },
-};
-
-const URGENCY_SAY: Record<Locale, Record<UrgencyLevel, string>> = {
-  en: {
-    critical: "critical — needed immediately",
-    urgent: "urgent — within two hours",
-    planned: "planned — within twenty four hours",
-  },
-  hi: {
-    critical: "गंभीर — तुरंत चाहिए",
-    urgent: "तत्काल — दो घंटे के अंदर",
-    planned: "नियोजित — चौबीस घंटे के अंदर",
-  },
-};
-
 function say(
   locale: Locale,
   path: MessagePath,
@@ -153,6 +124,35 @@ function nextField(draft: VoiceDraft): AskField | null {
   if (!draft.contactName.trim()) return "name";
   if (draft.phone.length !== 10) return "phone";
   return "confirm";
+}
+
+const ASK_STEPS: Exclude<AskField, "confirm">[] = [
+  "blood",
+  "units",
+  "urgency",
+  "hospital",
+  "name",
+  "phone",
+];
+
+function examplePhrases(field: AskField, locale: Locale): string[] {
+  if (field === "blood") return ["A+", "B+", "O+", "AB+", "O-"];
+  if (field === "units") return ["1", "2", "3"];
+  if (field === "urgency") {
+    return locale === "hi"
+      ? ["गंभीर", "तत्काल", "नियोजित"]
+      : ["Critical", "Urgent", "Planned"];
+  }
+  if (field === "hospital") {
+    return locale === "hi" ? ["हाँ", "अगला"] : ["Yes", "Next"];
+  }
+  if (field === "name") {
+    return locale === "hi" ? ["हाँ", "नया नाम"] : ["Yes", "New name"];
+  }
+  if (field === "phone") {
+    return locale === "hi" ? ["10 अंक"] : ["10 digits"];
+  }
+  return locale === "hi" ? ["हाँ", "नहीं"] : ["Yes", "No"];
 }
 
 function applyTranscript(
@@ -232,17 +232,6 @@ function applyTranscript(
   }
 
   return { draft: next };
-}
-
-function summaryOf(draft: VoiceDraft, locale: Locale) {
-  const group = draft.bloodGroups.map((item) => GROUP_SAY[locale][item]).join(", ");
-  const units = draft.units ?? 1;
-  const urgency = draft.urgency ? URGENCY_SAY[locale][draft.urgency] : "";
-  const hospital = draft.hospital?.name ?? "";
-  if (locale === "hi") {
-    return `${group}, ${units} यूनिट, ${urgency}, ${hospital} पर। संपर्क ${draft.contactName}, फ़ोन ${draft.phone}.`;
-  }
-  return `${group}, ${units} unit${units > 1 ? "s" : ""}, ${urgency}, at ${hospital}. Contact ${draft.contactName}, phone ${draft.phone}.`;
 }
 
 export function VoiceRequestAssistant({
@@ -333,7 +322,7 @@ export function VoiceRequestAssistant({
             name: option.name,
             km: formatDistance(option.distanceKm),
           });
-          visible = say(lang, "voiceAssist.askHospital");
+          visible = option.name;
         } else {
           spoken = say(lang, "voiceAssist.speakHospitalNone");
           visible = say(lang, "voiceAssist.askHospitalNone");
@@ -355,9 +344,7 @@ export function VoiceRequestAssistant({
         visible = say(lang, "voiceAssist.askPhone");
       }
       if (next === "confirm") {
-        spoken = say(lang, "voiceAssist.speakConfirm", {
-          summary: summaryOf(current, lang),
-        });
+        spoken = say(lang, "voiceAssist.speakConfirm");
         visible = say(lang, "voiceAssist.askConfirm");
       }
       setField(next);
@@ -607,20 +594,17 @@ export function VoiceRequestAssistant({
         aria-labelledby="voice-assist-title"
         className="relative flex max-h-[100svh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-white/15 bg-gradient-to-b from-[#3a121c] via-[#1c0d14] to-[#12080c] shadow-[0_30px_80px_-16px_rgba(0,0,0,0.7)] sm:max-h-[90svh] sm:rounded-[1.75rem]"
       >
-        <header className="flex items-start justify-between gap-3 px-5 pb-2 pt-5">
+        <header className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
           <div className="min-w-0">
             <p className="text-[0.65rem] font-black uppercase tracking-[0.2em] text-[#ff8a9a]">
               {t("voiceAssist.kicker")}
             </p>
             <h2
               id="voice-assist-title"
-              className="mt-1 font-display text-2xl font-extrabold tracking-tight text-white"
+              className="mt-0.5 font-display text-xl font-extrabold tracking-tight text-white sm:text-2xl"
             >
               {t("voiceAssist.title")}
             </h2>
-            <p className="mt-1 text-sm font-semibold text-white/65">
-              {t("voiceAssist.body")}
-            </p>
           </div>
           <button
             type="button"
@@ -639,7 +623,7 @@ export function VoiceRequestAssistant({
               type="button"
               onClick={() => setLocale(id)}
               className={cn(
-                "h-10 flex-1 rounded-xl text-sm font-black transition",
+                "h-9 flex-1 rounded-xl text-sm font-black transition",
                 locale === id
                   ? "bg-white text-ink"
                   : "bg-white/10 text-white/80 hover:bg-white/16",
@@ -650,8 +634,46 @@ export function VoiceRequestAssistant({
           ))}
         </div>
 
-        <div className="flex flex-1 flex-col items-center overflow-y-auto px-5 py-6">
-          <div className="relative flex size-36 items-center justify-center">
+        <ol
+          className={cn(
+            stepFont.className,
+            "mt-3 flex flex-wrap justify-center gap-2 px-5",
+          )}
+          aria-label={t("voiceAssist.kicker")}
+        >
+          {ASK_STEPS.map((step, index) => {
+            const current = field === step;
+            const label =
+              step === "blood"
+                ? t("voiceAssist.group")
+                : step === "units"
+                  ? t("voiceAssist.units")
+                  : step === "urgency"
+                    ? t("voiceAssist.urgency")
+                    : step === "hospital"
+                      ? t("voiceAssist.hospital")
+                      : step === "name"
+                        ? t("voiceAssist.name")
+                        : t("voiceAssist.phone");
+            return (
+              <li
+                key={step}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[0.78rem] font-extrabold tracking-wide shadow-[0_10px_22px_-12px_rgba(0,0,0,0.55)]",
+                  current
+                    ? "bg-emerald-500 text-white ring-2 ring-emerald-200/80"
+                    : "bg-gradient-to-r from-[#ff4d6d] to-[#9f1239] text-white",
+                )}
+              >
+                <span className="tabular-nums opacity-90">.{index + 1}</span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
+
+        <div className="flex flex-1 flex-col items-center overflow-y-auto px-5 py-5">
+          <div className="relative flex size-32 items-center justify-center">
             {status === "listening" ? (
               <>
                 <span className="voice-ring absolute inset-0 rounded-full bg-[#0f9f7a]/35" />
@@ -673,7 +695,7 @@ export function VoiceRequestAssistant({
                 }
               }}
               className={cn(
-                "relative flex size-24 items-center justify-center rounded-full text-white transition",
+                "relative flex size-20 items-center justify-center rounded-full text-white transition",
                 status === "listening"
                   ? "bg-gradient-to-br from-[#14b8a6] to-[#0a6b54] shadow-[0_18px_40px_-12px_rgba(15,159,122,0.9)] ring-4 ring-[#0f9f7a]/35"
                   : status === "speaking"
@@ -683,9 +705,9 @@ export function VoiceRequestAssistant({
               aria-label={t("voiceAssist.tapSpeak")}
             >
               {status === "submitting" || status === "starting" ? (
-                <Loader2 className="size-9 animate-spin" aria-hidden />
+                <Loader2 className="size-8 animate-spin" aria-hidden />
               ) : (
-                <Mic className="size-9" aria-hidden />
+                <Mic className="size-8" aria-hidden />
               )}
             </button>
             {status === "listening" && showSpeakCue ? (
@@ -697,7 +719,7 @@ export function VoiceRequestAssistant({
 
           <p
             className={cn(
-              "mt-8 text-xs font-black uppercase tracking-[0.18em]",
+              "mt-6 text-[0.7rem] font-black uppercase tracking-[0.2em]",
               status === "listening" ? "text-[#5eead4]" : "text-[#ff8a9a]",
             )}
           >
@@ -712,27 +734,27 @@ export function VoiceRequestAssistant({
                     : status === "blocked"
                       ? t("voiceAssist.alreadyOpenTitle")
                       : t("voiceAssist.ready")}
-            {status === "listening" || status === "speaking"
-              ? ` · ${
-                  field === "blood"
-                    ? t("voiceAssist.group")
-                    : field === "units"
-                      ? t("voiceAssist.units")
-                      : field === "urgency"
-                        ? t("voiceAssist.urgency")
-                        : field === "hospital"
-                          ? t("voiceAssist.hospital")
-                          : field === "name"
-                            ? t("voiceAssist.name")
-                            : field === "phone"
-                              ? t("voiceAssist.phone")
-                              : t("voiceAssist.confirm")
-                }`
-              : ""}
           </p>
-          <p className="mt-3 max-w-sm text-center font-display text-[1.65rem] font-black leading-tight tracking-tight text-white sm:text-3xl">
-            {prompt || t("voiceAssist.body")}
+          <p className="mt-2 max-w-sm text-center font-display text-[2.15rem] font-black leading-[1.05] tracking-tight text-white sm:text-4xl">
+            {prompt || t("voiceAssist.readyAsk")}
           </p>
+          {field && (status === "listening" || status === "speaking") ? (
+            <div className="mt-4 flex max-w-sm flex-col items-center gap-2">
+              <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-white/45">
+                {t("voiceAssist.sayThis")}
+              </p>
+              <ul className="flex flex-wrap justify-center gap-1.5">
+                {examplePhrases(field, locale).map((phrase) => (
+                  <li
+                    key={phrase}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-black text-ink"
+                  >
+                    {phrase}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {caption ? (
             <p className="mt-3 max-w-sm text-center text-sm font-semibold text-white/70">
               “{caption}”
@@ -757,19 +779,17 @@ export function VoiceRequestAssistant({
             </button>
           ) : null}
 
-          {filled.length > 0 ? (
-            <ul className="mt-5 grid w-full gap-2">
+          {filled.length > 0 && field !== "confirm" ? (
+            <ul className="mt-5 flex w-full flex-wrap justify-center gap-1.5">
               {filled.map((item) => (
                 <li
                   key={item.label}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/8 px-3.5 py-2.5 ring-1 ring-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10"
                 >
-                  <span className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-white/50">
+                  <span className="text-[0.58rem] font-black uppercase tracking-wider text-white/45">
                     {item.label}
                   </span>
-                  <span className="text-right text-sm font-bold text-white">
-                    {item.value}
-                  </span>
+                  <span className="text-sm font-black text-white">{item.value}</span>
                 </li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Nunito } from "next/font/google";
 import {
   ArrowUpRight,
@@ -580,8 +580,8 @@ export function VoiceRequestAssistant({
       : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
-  return (
-    <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
+  const overlay = (
+    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center">
       <button
         type="button"
         className="absolute inset-0 bg-[#14080c]/80 backdrop-blur-[3px]"
@@ -665,7 +665,7 @@ export function VoiceRequestAssistant({
                     : "bg-gradient-to-r from-[#ff4d6d] to-[#9f1239] text-white",
                 )}
               >
-                <span className="tabular-nums opacity-90">.{index + 1}</span>
+                <span className="tabular-nums opacity-90">{index + 1}.</span>
                 {label}
               </li>
             );
@@ -735,7 +735,17 @@ export function VoiceRequestAssistant({
                       ? t("voiceAssist.alreadyOpenTitle")
                       : t("voiceAssist.ready")}
           </p>
-          <p className="mt-2 max-w-sm text-center font-display text-[2.15rem] font-black leading-[1.05] tracking-tight text-white sm:text-4xl">
+          <p
+            className={cn(
+              "mt-2 max-w-sm text-center leading-snug tracking-tight text-white",
+              status === "blocked" || status === "error"
+                ? cn(
+                    stepFont.className,
+                    "text-[1.55rem] font-bold sm:text-[1.75rem]",
+                  )
+                : "font-display text-[2.15rem] font-black sm:text-4xl",
+            )}
+          >
             {prompt || t("voiceAssist.readyAsk")}
           </p>
           {field && (status === "listening" || status === "speaking") ? (
@@ -820,4 +830,7 @@ export function VoiceRequestAssistant({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return overlay;
+  return createPortal(overlay, document.body);
 }

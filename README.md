@@ -28,17 +28,15 @@
 | Architecture PDF/PPT | TODO: Add a public link to the architecture file |
 | Project presentation PDF/PPT | TODO: Add a public link to the presentation |
 
-## 👥 Team Details
+### 👥 Team Details
 
-| Member |
-|---|
 
-| Medhansh Garg | 
-| Amulya Singla | 
-| Himanshu Singhal| 
+**Team Leader:** Amulya Singla
 
-**Mentor:** TODO: Add name and affiliation, or mark not applicable.  
-**Project contact:** TODO: Add a public project email or GitHub profile.
+**Team Member:** Medhansh Garg
+
+**Team Member:** Himanshu Singhal
+
 
 ## 🌍 Overview
 

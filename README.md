@@ -22,7 +22,7 @@
 | Incubator | TODO: Enter incubator name, or “Not affiliated” |
 | Hackathon / event | Codex 3.O |
 | Track / problem statement ID | Open Innovation |
-| Public repository |  |
+| Public repository | https://github.com/Viberscode/bnb_final |
 | Live prototype | https://bloodnearby.vercel.app/ |
 | Demo video |  |
 | Architecture PDF/PPT | TODO: Add a public link to the architecture file |

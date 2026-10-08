@@ -175,20 +175,22 @@ flowchart TD
 
 No operational blood-stock feed, official partnership, or access to government APIs is claimed in the current prototype.
 
-## 🛠️ Technical Stack
+## 🛠️ Proposed Technical Stack
 
-| Layer | Technology / status |
-|---|---|
-| Deployment | Vercel-hosted public prototype |
-| Mapping | Leaflet with OpenStreetMap attribution |
-| Authentication | Google sign-in interface; TODO: Specify implementation |
-| Frontend framework / language | TODO: Confirm from repository manifests |
-| Styling / UI libraries | TODO: Confirm from repository manifests |
-| Backend / API framework | TODO: Enter actual implementation |
-| Database and real-time transport | TODO: Enter actual implementation |
-| Speech recognition / recording | TODO: Enter actual browser API, service, or model |
-| Notifications | TODO: Enter implemented channels and provider, or mark planned |
-| Testing and monitoring | TODO: Enter actual tools |
+| Layer | Technology | Purpose |
+|---|---|---|
+| Deployment | Vercel | Host and deploy the web application |
+| Mapping | Leaflet.js + OpenStreetMap | Display hospital locations and interactive maps |
+| Authentication | Supabase Auth + Google OAuth | Manage Google sign-in and user sessions |
+| Frontend framework / language | React + TypeScript + Vite | Build the user interface and application logic |
+| Styling / UI libraries | Tailwind CSS + shadcn/ui | Create responsive layouts and reusable interface components |
+| Backend / API framework | Supabase Edge Functions | Execute server-side matching, verification, and notification logic |
+| Database and real-time transport | Supabase PostgreSQL + Supabase Realtime | Store requests and donor profiles; deliver live status updates |
+| Speech recognition / recording | Web Speech API + MediaRecorder API | Transcribe spoken requests and record voice notes |
+| Notifications | Firebase Cloud Messaging | Send browser push notifications |
+| Testing and monitoring | Playwright + Sentry | Test user journeys and monitor application errors |
+
+> This table describes the proposed stack. Vercel and Leaflet/OpenStreetMap were observed in the public prototype; the remaining tools require confirmation from the source code. Hindi/English speech recognition and browser notification support will be validated on target devices.
 
 ## 🤖 AI/ML Model or Framework Details
 

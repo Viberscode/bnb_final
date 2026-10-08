@@ -17,25 +17,25 @@
 | Project title | BloodNearby — Multilingual Blood Request and Donor Coordination Platform |
 | Domain | Healthcare · Social Impact · Digital Accessibility |
 | Project category | Software / Web Platform |
-| Team name | TODO: Enter team name |
-| College | Delhi Technological University (DTU), Delhi, India |
+| Team name | Shadow |
+| College | Delhi Technological University (DTU), Delhi, India|
 | Incubator | TODO: Enter incubator name, or “Not affiliated” |
-| Hackathon / event | TODO: Enter event name |
-| Track / problem statement ID | TODO: Enter event-specific track or ID, if applicable |
-| Public repository | TODO: Add this GitHub repository’s URL |
+| Hackathon / event | Codex 3.O |
+| Track / problem statement ID | Open Innovation |
+| Public repository |  |
 | Live prototype | https://bloodnearby.vercel.app/ |
-| Demo video | TODO: Add the 15–20-minute unlisted YouTube video URL |
+| Demo video |  |
 | Architecture PDF/PPT | TODO: Add a public link to the architecture file |
 | Project presentation PDF/PPT | TODO: Add a public link to the presentation |
 
 ## 👥 Team Details
 
-| Member | Role | Contribution |
-|---|---|---|
+| Member |
+|---|
 
-| TODO: Medhansh Garg | 
-| TODO: Amulya Singla | 
-| TODO: Himanshu Singhal| 
+| Medhansh Garg | 
+| Amulya Singla | 
+| Himanshu Singhal| 
 
 **Mentor:** TODO: Add name and affiliation, or mark not applicable.  
 **Project contact:** TODO: Add a public project email or GitHub profile.
